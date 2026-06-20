@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can edit their own profiles" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can insert their own profiles" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- 2. Create Wallets Table
 CREATE TABLE IF NOT EXISTS public.wallets (
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.wallets (
 ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Wallets are viewable by owners" ON public.wallets FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Wallets can be updated by owners" ON public.wallets FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own wallets" ON public.wallets FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 3. Create Transactions Ledger Table
 CREATE TABLE IF NOT EXISTS public.transactions (
