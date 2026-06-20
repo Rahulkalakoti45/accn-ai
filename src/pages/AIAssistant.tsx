@@ -285,29 +285,25 @@ Provide precise, direct, and elite answers. If they ask something unrelated to A
     setSpeaking(false);
 
     try {
-      // 2. Build history payload for the LLM
-      // Limit history to last 10 messages to save context and speed up response
-      const messageHistory = sessionWithUserMsg.messages.slice(-10).map(m => ({
-        role: m.sender === 'user' ? 'user' : 'assistant',
-        content: m.text
-      }));
-
+      // 2. Build conversation history as text for GET request
+      // Limit to last 8 messages for context safety and URL length constraints
       const systemPrompt = buildSystemPrompt();
-      const payload = {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messageHistory
-        ],
-        model: currentSession.model || 'openai'
-      };
+      const recentMessages = sessionWithUserMsg.messages.slice(-8);
+      const conversationContext = recentMessages.map(m => {
+        return `${m.sender === 'user' ? 'User' : 'ARIA'}: ${m.text}`;
+      }).join('\n');
 
-      // 3. API Call
-      const response = await fetch('https://text.pollinations.ai/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+      const fullPrompt = `${conversationContext}\nARIA:`;
+
+      const encodedPrompt = encodeURIComponent(fullPrompt);
+      const encodedSystem = encodeURIComponent(systemPrompt);
+      const model = currentSession.model || 'openai';
+
+      const url = `https://text.pollinations.ai/${encodedPrompt}?model=${model}&system=${encodedSystem}`;
+
+      // 3. API Call (GET request to bypass CORS/POST WAF rate limits)
+      const response = await fetch(url, {
+        method: 'GET'
       });
 
       if (!response.ok) {
@@ -626,14 +622,14 @@ Provide precise, direct, and elite answers. If they ask something unrelated to A
                     key={msg.id}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`flex gap-3.5 max-w-[90%] md:max-w-[85%] ${isAi ? 'self-start' : 'self-end flex-row-reverse'}`}
+                    className={`flex gap-3.5 max-w-[90%] md:max-w-[85%] ${isAi ? 'self-start' : 'self-end'}`}
                   >
-                    {/* Message sender Avatar Icon */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border flex-shrink-0 select-none ${
-                      isAi ? 'bg-accentGreen/15 border-accentGreen/35 text-accentGreen mt-1.5' : 'bg-white/5 border-white/10 text-textSecondary mt-0.5'
-                    }`}>
-                      {isAi ? <Bot className="w-4.5 h-4.5" /> : <UserIcon className="w-4 h-4" />}
-                    </div>
+                    {/* Message sender Avatar Icon on the left for AI */}
+                    {isAi && (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center border flex-shrink-0 select-none bg-accentGreen/15 border-accentGreen/35 text-accentGreen mt-1.5">
+                        <Bot className="w-4.5 h-4.5" />
+                      </div>
+                    )}
 
                     {/* Chat dialog bubble */}
                     <div className={`p-4 rounded-2xl ${
@@ -648,6 +644,13 @@ Provide precise, direct, and elite answers. If they ask something unrelated to A
                         {msg.timestamp}
                       </span>
                     </div>
+
+                    {/* Message sender Avatar Icon on the right for User */}
+                    {!isAi && (
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center border flex-shrink-0 select-none bg-white/5 border-white/10 text-textSecondary mt-0.5">
+                        <UserIcon className="w-4 h-4" />
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
