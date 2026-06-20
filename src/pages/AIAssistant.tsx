@@ -47,7 +47,11 @@ export const AIAssistant: React.FC = () => {
     user, 
     walletBalance, 
     walletCredits, 
-    connectedDevices 
+    connectedDevices,
+    transactionHistory,
+    co2Saved,
+    targetCO2,
+    marketplaceListings
   } = useStore();
 
   // Chat sessions state
@@ -231,6 +235,16 @@ Select a model from the top dropdown, or pick one of these questions to start:`,
       .map(d => `- Meter ID: ${d.id}, Type: ${d.type}, Status: ${d.status}, Last Sync: ${d.lastSync}`)
       .join('\n');
 
+    const txsText = transactionHistory
+      .slice(0, 5)
+      .map(t => `- [${t.timestamp}] ${t.title}: ${t.description} (${t.amount || 'N/A'})`)
+      .join('\n');
+
+    const marketText = marketplaceListings
+      .slice(0, 5)
+      .map(m => `- Seller: ${m.seller}, Location: ${m.location}, Credits: ${m.credits} CR, Price: ₹${m.pricePerCredit}/CR, Status: ${m.verified ? 'Verified' : 'Unverified'}`)
+      .join('\n');
+
     return `You are ARIA (AI Carbon Credit and Energy Analytics Assistant), an advanced AI carbon mitigation concierge running on the ACCN (AI Carbon Credit Network) SaaS dashboard.
 
 Your persona is crisp, mathematical, futuristic, and highly intelligent. You are expert in clean tech, smart energy networks, solar grids, carbon accounting, and cryptographic tokens.
@@ -238,7 +252,7 @@ You are also a fully capable general AI (like ChatGPT), meaning you can answer g
 
 Use Markdown tags (bold, italic, list items, headers, code blocks with correct language extension, and formatted markdown tables) to structure your responses.
 
-Below is the live context of the authenticated user you are assisting. Reference this context when they ask about their profile, credits, smart meters, or wallet stats:
+Below is the live context of the authenticated user you are assisting. Reference this context when they ask about their profile, credits, smart meters, wallet stats, transaction history, carbon impact, or marketplace:
 [USER PROFILE CONTEXT]
 - Name: ${user.name}
 - Email: ${user.email}
@@ -246,8 +260,16 @@ Below is the live context of the authenticated user you are assisting. Reference
 - Trust Score: ${user.trustScore}% (KYC: ${user.kycVerified ? 'Verified' : 'Pending'})
 - Wallet Balance: ₹${walletBalance.toLocaleString()} INR
 - Carbon Wallet Credits: ${walletCredits} CR (Credits Address: ${user.walletAddress})
-- Connected Telemetry Hardware:
+- Environmental Impact: ${co2Saved} kg CO₂ saved of ${targetCO2} kg target
+
+[CONNECTED TELEMETRY HARDWARE]
 ${metersText || 'No smart meters connected.'}
+
+[RECENT TRANSACTIONS LEDGER (Last 5)]
+${txsText || 'No recent transactions.'}
+
+[LIVE MARKETPLACE OFFERS (Top 5)]
+${marketText || 'No active marketplace listings.'}
 
 Provide precise, direct, and elite answers. If they ask something unrelated to ACCN, answer it perfectly with your general knowledge, but maintain a helpful and professional tone.`;
   };
