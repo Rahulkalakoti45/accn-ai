@@ -246,11 +246,30 @@ export const useStore = create<AppState>((set, get) => ({
         set({ isAuthenticated: true });
         
         // Fetch profiles
-        const { data: profile } = await supabase
+        let { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', sessionUser.id)
           .single();
+
+        if (!profile) {
+          // Auto-create profile row for authenticated users if missing
+          const newProfile = {
+            id: sessionUser.id,
+            name: sessionUser.user_metadata?.full_name || sessionUser.email?.split('@')[0] || 'User',
+            email: sessionUser.email || '',
+            trust_score: 96,
+            kyc_verified: true,
+            location: 'Hyderabad, India',
+            avatar_url: sessionUser.user_metadata?.avatar_url || ''
+          };
+          const { error: insertErr } = await supabase.from('profiles').insert(newProfile);
+          if (!insertErr) {
+            profile = newProfile as any;
+          } else {
+            console.error('Failed to auto-create profiles row:', insertErr);
+          }
+        }
 
         if (profile) {
           set((state) => ({
@@ -268,11 +287,28 @@ export const useStore = create<AppState>((set, get) => ({
         }
 
         // Fetch wallet
-        const { data: wallet } = await supabase
+        let { data: wallet } = await supabase
           .from('wallets')
           .select('*')
           .eq('user_id', sessionUser.id)
           .single();
+
+        if (!wallet && profile) {
+          // Auto-create wallet row for authenticated users if missing
+          const walletAddr = '0x' + Math.random().toString(36).substring(2, 10).toUpperCase() + '...' + Math.random().toString(36).substring(2, 6).toUpperCase();
+          const newWallet = {
+            user_id: sessionUser.id,
+            address: walletAddr,
+            balance: 2450.0,
+            credits: 25.5
+          };
+          const { error: walletErr } = await supabase.from('wallets').insert(newWallet);
+          if (!walletErr) {
+            wallet = newWallet as any;
+          } else {
+            console.error('Failed to auto-create wallet row:', walletErr);
+          }
+        }
 
         if (wallet) {
           set({

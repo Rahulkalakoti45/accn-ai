@@ -28,7 +28,10 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
  */
 export const uploadFile = async (bucket: string, path: string, file: File): Promise<string | null> => {
   try {
-    const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+    // Slugify path to replace any non-ASCII characters (e.g. Hindi name chars) with underscores
+    const safePath = path.replace(/[^\x00-\x7F]/g, "_");
+
+    const { data, error } = await supabase.storage.from(bucket).upload(safePath, file, {
       cacheControl: '3600',
       upsert: true
     });

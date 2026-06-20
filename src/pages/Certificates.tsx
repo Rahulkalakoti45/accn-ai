@@ -28,12 +28,157 @@ export const Certificates: React.FC = () => {
   // Extract mint transactions to generate certificates
   const certificates = transactionHistory.filter((tx) => tx.type === 'mint');
 
-  const handleAction = (action: string) => {
-    addToast('info', 'Document Hub', `Executing command: ${action}...`);
-    if (action === 'Download') {
-      setTimeout(() => {
-        addToast('success', 'PDF Ready', 'Cryptographic certificate downloaded successfully.');
-      }, 1500);
+  const downloadCertificateAsPDF = (cert: Activity) => {
+    const hashId = `ACCN-2024-${cert.id.substring(3, 8).toUpperCase()}`;
+    const amountStr = cert.amount || '0';
+    const amountVal = amountStr.includes(' ') ? amountStr.split(' ')[0] : amountStr;
+    const co2Offset = Math.round(parseFloat(amountVal) * 3.7) || 0;
+
+    // Create a hidden iframe to print
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) return;
+
+    doc.write(`
+      <html>
+        <head>
+          <title>${hashId}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+            body {
+              font-family: 'DM Sans', sans-serif;
+              background-color: #080C14;
+              color: #F0F4FF;
+              margin: 0;
+              padding: 40px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              box-sizing: border-box;
+            }
+            .certificate-border {
+              border: 4px double #7B4FFF;
+              padding: 40px;
+              width: 100%;
+              max-width: 650px;
+              height: 450px;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              background-color: #1A2235;
+              border-radius: 16px;
+              box-shadow: 0 0 30px rgba(123, 79, 255, 0.15);
+              position: relative;
+              box-sizing: border-box;
+            }
+            .corner-t-l { position: absolute; top: 12px; left: 12px; width: 15px; height: 15px; border-top: 2px solid #7B4FFF; border-left: 2px solid #7B4FFF; }
+            .corner-t-r { position: absolute; top: 12px; right: 12px; width: 15px; height: 15px; border-top: 2px solid #7B4FFF; border-right: 2px solid #7B4FFF; }
+            .corner-b-l { position: absolute; bottom: 12px; left: 12px; width: 15px; height: 15px; border-bottom: 2px solid #7B4FFF; border-left: 2px solid #7B4FFF; }
+            .corner-b-r { position: absolute; bottom: 12px; right: 12px; width: 15px; height: 15px; border-bottom: 2px solid #7B4FFF; border-right: 2px solid #7B4FFF; }
+            
+            .header { text-align: center; }
+            .header span { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #7B4FFF; letter-spacing: 4px; font-weight: bold; text-transform: uppercase; }
+            .header h3 { font-size: 14px; font-family: 'JetBrains Mono', monospace; color: #ffffff; letter-spacing: 2px; margin: 8px 0 0 0; }
+            
+            .content { text-align: center; margin: 25px 0; }
+            .content .amount { font-size: 40px; font-weight: bold; font-family: 'JetBrains Mono', monospace; color: #00E5A0; margin: 0; }
+            .content .label { font-size: 10px; color: #a0aec0; letter-spacing: 2px; text-transform: uppercase; margin-top: 5px; }
+            .content .desc { font-size: 12px; color: #e2e8f0; margin-top: 15px; line-height: 1.6; }
+            
+            .footer { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; }
+            .footer-left { display: flex; align-items: center; gap: 15px; }
+            .footer-right { text-align: right; font-family: 'JetBrains Mono', monospace; }
+            .footer-right .signed { font-size: 10px; color: #00E5A0; font-weight: bold; }
+            .footer-right .hash { font-size: 8px; color: #718096; margin-top: 3px; }
+            
+            .qr-placeholder {
+              width: 50px;
+              height: 50px;
+              background-color: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 8px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              color: #ffffff;
+              font-size: 8px;
+              font-family: 'JetBrains Mono', monospace;
+            }
+            
+            @media print {
+              body { background: #ffffff !important; color: #000000 !important; padding: 0; }
+              .certificate-border { background: #ffffff !important; border-color: #000000 !important; box-shadow: none !important; color: #000000 !important; }
+              .header h3, .content .amount, .footer-right .signed { color: #000000 !important; }
+              .header span, .corner-t-l, .corner-t-r, .corner-b-l, .corner-b-r { border-color: #000000 !important; color: #000000 !important; }
+              .content .desc, .content .label { color: #333333 !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="certificate-border">
+            <div class="corner-t-l"></div>
+            <div class="corner-t-r"></div>
+            <div class="corner-b-l"></div>
+            <div class="corner-b-r"></div>
+            
+            <div class="header">
+              <span>Carbon Offset Asset</span>
+              <h3>${hashId}</h3>
+            </div>
+            
+            <div class="content">
+              <div class="amount">${amountVal} CARBON CREDITS</div>
+              <div class="label">Equivalent to ${co2Offset} kg CO₂ offset</div>
+              <div class="desc">
+                This document certifies that <strong>${amountVal} Carbon Credits</strong> have been successfully 
+                minted on the AI Carbon Credit Network (ACCN) Registry. Verified via Smart Grid 
+                telemetry sync by owner <strong>${user.name}</strong>.
+              </div>
+            </div>
+            
+            <div class="footer">
+              <div class="footer-left">
+                <div class="qr-placeholder">ACCN QR</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #718096; text-align: left;">
+                  MINT HASH: 0x8a92f...724521<br>
+                  VALIDITY: DEC 2026 REG REVIEW
+                </div>
+              </div>
+              <div class="footer-right">
+                <div class="signed">✓ Signed by ARIA AI</div>
+                <div class="hash">SHA256: 3a921d...45bd8821</div>
+              </div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.parent.document.body.removeChild(window.frameElement);
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
+  };
+
+  const handleAction = (action: string, cert?: Activity) => {
+    if (action === 'Download' && cert) {
+      addToast('info', 'Document Hub', `Generating cryptographic certificate PDF...`);
+      downloadCertificateAsPDF(cert);
+    } else {
+      addToast('info', 'Document Hub', `Executing command: ${action}...`);
     }
   };
 
@@ -232,7 +377,7 @@ export const Certificates: React.FC = () => {
               {/* Actions row below */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
-                  onClick={() => handleAction('Download')}
+                  onClick={() => handleAction('Download', selectedCert)}
                   className="py-2.5 rounded-xl border border-cardBorder bg-cardSurface/40 hover:bg-cardSurface/80 text-[10px] font-bold text-white flex items-center justify-center gap-1 hover:border-white/10"
                 >
                   <Download className="w-3.5 h-3.5" />

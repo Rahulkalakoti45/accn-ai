@@ -20,11 +20,13 @@ import {
 } from 'lucide-react';
 import { useToastStore } from '../store/useToastStore';
 import { useTheme } from '../utils/theme';
+import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ESGReports: React.FC = () => {
   const theme = useTheme();
   const { addToast } = useToastStore();
+  const { user } = useStore();
   const [period, setPeriod] = useState('Q3 2024');
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
@@ -62,6 +64,259 @@ export const ESGReports: React.FC = () => {
     return <rect x={x} y={y} width={width} height={height} fill={fill} rx={3} />;
   };
 
+  const downloadESGReportAsPDF = () => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) return;
+
+    doc.write(`
+      <html>
+        <head>
+          <title>ESG_Carbon_Report_${period.replace(' ', '_')}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+            body {
+              font-family: 'DM Sans', sans-serif;
+              background-color: #080C14;
+              color: #F0F4FF;
+              margin: 0;
+              padding: 40px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              box-sizing: border-box;
+            }
+            .report-card {
+              border: 1px solid rgba(255,255,255,0.1);
+              padding: 40px;
+              width: 100%;
+              max-width: 700px;
+              background-color: #1A2235;
+              border-radius: 16px;
+              box-sizing: border-box;
+              box-shadow: 0 0 30px rgba(0, 229, 160, 0.1);
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid rgba(255,255,255,0.1);
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header-title h1 {
+              font-size: 20px;
+              font-weight: bold;
+              margin: 0;
+              color: #ffffff;
+            }
+            .header-title p {
+              font-size: 11px;
+              color: #a0aec0;
+              margin: 5px 0 0 0;
+            }
+            .period-badge {
+              background-color: rgba(0, 229, 160, 0.15);
+              border: 1px solid rgba(0, 229, 160, 0.3);
+              color: #00E5A0;
+              font-family: 'JetBrains Mono', monospace;
+              font-size: 10px;
+              padding: 6px 12px;
+              border-radius: 20px;
+              font-weight: bold;
+            }
+            
+            .meta-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              margin-bottom: 30px;
+              font-size: 12px;
+            }
+            .meta-item {
+              background-color: rgba(255,255,255,0.02);
+              border: 1px solid rgba(255,255,255,0.05);
+              padding: 12px 15px;
+              border-radius: 10px;
+            }
+            .meta-item span {
+              color: #718096;
+              font-size: 10px;
+              text-transform: uppercase;
+              display: block;
+              margin-bottom: 4px;
+            }
+            .meta-item strong {
+              color: #ffffff;
+              font-size: 13px;
+            }
+            
+            .stats-section {
+              margin-bottom: 30px;
+            }
+            .stats-title {
+              font-size: 12px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              color: #00E5A0;
+              font-weight: bold;
+              margin-bottom: 15px;
+            }
+            .stats-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr 1fr;
+              gap: 15px;
+            }
+            .stat-box {
+              text-align: center;
+              background-color: rgba(255,255,255,0.03);
+              border: 1px solid rgba(255,255,255,0.05);
+              padding: 20px 15px;
+              border-radius: 12px;
+            }
+            .stat-value {
+              font-size: 24px;
+              font-weight: bold;
+              font-family: 'JetBrains Mono', monospace;
+              color: #ffffff;
+            }
+            .stat-label {
+              font-size: 10px;
+              color: #a0aec0;
+              margin-top: 5px;
+              text-transform: uppercase;
+            }
+            
+            .verification-text {
+              background-color: rgba(61, 110, 255, 0.05);
+              border: 1px solid rgba(61, 110, 255, 0.2);
+              padding: 20px;
+              border-radius: 12px;
+              font-size: 12px;
+              line-height: 1.6;
+              color: #e2e8f0;
+              margin-top: 30px;
+            }
+            .verification-footer {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid rgba(255,255,255,0.1);
+            }
+            .signature {
+              font-family: 'JetBrains Mono', monospace;
+              font-size: 9px;
+              color: #718096;
+            }
+            .signature strong {
+              color: #00E5A0;
+              display: block;
+              font-size: 11px;
+              margin-bottom: 4px;
+            }
+            
+            @media print {
+              body { background: #ffffff !important; color: #000000 !important; padding: 0; }
+              .report-card { background: #ffffff !important; box-shadow: none !important; border: 1px solid #000000 !important; color: #000000 !important; }
+              .header-title h1, .stat-value, .meta-item strong { color: #000000 !important; }
+              .period-badge { background: #ffffff !important; border-color: #000000 !important; color: #000000 !important; }
+              .verification-text { background: #ffffff !important; border-color: #000000 !important; color: #000000 !important; }
+              .signature strong { color: #000000 !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="report-card">
+            <div class="header">
+              <div class="header-title">
+                <h1>ACCN ESG CARBON COMPLIANCE</h1>
+                <p>Generated by ACCN AI Audit Engine</p>
+              </div>
+              <div class="period-badge">${period} REPORT</div>
+            </div>
+            
+            <div class="meta-grid">
+              <div class="meta-item">
+                <span>Organization Member</span>
+                <strong>${user.name}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Location Jurisdiction</span>
+                <strong>${user.location}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Account Email</span>
+                <strong>${user.email}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Compliance Verification Status</span>
+                <strong>ACTIVE / SIGNED</strong>
+              </div>
+            </div>
+            
+            <div class="stats-section">
+              <div class="stats-title">Carbon Offset Audit Indicators</div>
+              <div class="stats-grid">
+                <div class="stat-box">
+                  <div class="stat-value">250 Tons</div>
+                  <div class="stat-label">CO₂ Offset Saved</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-value">500 Tons</div>
+                  <div class="stat-label">Quarterly Target</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-value">94%</div>
+                  <div class="stat-label">Compliance Score</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="verification-text">
+              <strong>Cryptographic Audit Statement:</strong><br>
+              This document serves as verification that the registered smart grids paired to owner 
+              <strong>${user.name}</strong> have successfully verified <strong>250 Tons of CO₂</strong> 
+              reduction against a target benchmark of <strong>500 Tons</strong>. 
+              Telemetry feeds have been verified using ARIA AI audit logs with a reliability match 
+              of <strong>${user.trustScore}%</strong>.
+            </div>
+            
+            <div class="verification-footer">
+              <div class="signature">
+                <strong>✓ VERIFIED BY ARIA AI</strong>
+                ACCN Compliance Protocol V3.0
+              </div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #718096; text-align: right;">
+                REPORT ID: ACCN-ESG-${period.replace(' ', '-')}-${Date.now().toString().slice(-5)}<br>
+                SHA-256 SIGNATURE: a8b2f9011de54...287c118b
+              </div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.parent.document.body.removeChild(window.frameElement);
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
+  };
+
   const handleGenerateReport = () => {
     setGenerating(true);
     setGenProgress(0);
@@ -77,7 +332,8 @@ export const ESGReports: React.FC = () => {
           clearInterval(timer);
           setTimeout(() => {
             setGenerating(false);
-            addToast('success', 'Compliance Report Ready', 'ESG_Carbon_Report_Q3_2024.pdf downloaded.');
+            downloadESGReportAsPDF();
+            addToast('success', 'Compliance Report Ready', `ESG_Carbon_Report_${period.replace(' ', '_')}.pdf compiled and downloaded.`);
           }, 300);
           return 100;
         }
@@ -86,7 +342,7 @@ export const ESGReports: React.FC = () => {
     }, 80);
 
     return () => clearInterval(timer);
-  }, [generating, addToast]);
+  }, [generating, period, addToast]);
 
   return (
     <div className="flex flex-col gap-6 w-full pb-12 select-none">
