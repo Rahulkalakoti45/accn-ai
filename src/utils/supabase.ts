@@ -22,3 +22,22 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Upload a file to a Supabase storage bucket and return its public URL
+ */
+export const uploadFile = async (bucket: string, path: string, file: File): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+    if (error) throw error;
+    
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+    return urlData.publicUrl;
+  } catch (err) {
+    console.error('Supabase storage upload error:', err);
+    return null;
+  }
+};

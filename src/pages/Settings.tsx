@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   User as UserIcon, 
   Cpu, 
@@ -18,6 +18,7 @@ import { useStore } from '../store/useStore';
 import { useToastStore } from '../store/useToastStore';
 import { useTheme } from '../utils/theme';
 import { motion, AnimatePresence } from 'framer-motion';
+import { uploadFile } from '../utils/supabase';
 
 export const Settings: React.FC = () => {
   const theme = useTheme();
@@ -43,6 +44,37 @@ export const Settings: React.FC = () => {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState('+91 98765 43210');
   const [loc, setLoc] = useState(user.location);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      addToast('error', 'Upload Failed', 'Image must be less than 2MB.');
+      return;
+    }
+
+    addToast('info', 'Uploading...', 'Uploading profile image to secure storage.');
+    const fileExt = file.name.split('.').pop() || 'png';
+    const filePath = `avatars/${user.id || 'mock'}-${Date.now()}.${fileExt}`;
+    
+    try {
+      const publicUrl = await uploadFile('accn-assets', filePath, file);
+      if (publicUrl) {
+        updateUser({ avatarUrl: publicUrl });
+        addToast('success', 'Profile Updated', 'Profile image synchronized successfully.');
+      } else {
+        throw new Error('Upload returned empty URL');
+      }
+    } catch (err) {
+      console.warn('Supabase upload failed, using local object preview:', err);
+      const localUrl = URL.createObjectURL(file);
+      updateUser({ avatarUrl: localUrl });
+      addToast('warning', 'Local Preview', 'Profile image updated locally (offline fallback mode).');
+    }
+  };
 
   const handleProfileSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,16 +186,27 @@ export const Settings: React.FC = () => {
               <form onSubmit={handleProfileSave} className="flex flex-col gap-4">
                 {/* Avatar upload representation */}
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-cardBorder border border-white/10 flex items-center justify-center text-textSecondary text-xl select-none">
-                    RK
+                  <div className="w-16 h-16 rounded-2xl bg-cardBorder border border-white/10 flex items-center justify-center text-textSecondary text-xl select-none overflow-hidden">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      name.split(' ').map(n => n[0]).join('').toUpperCase() || 'RK'
+                    )}
                   </div>
                   <button
                     type="button"
-                    onClick={() => addToast('info', 'Avatar Upload', 'Photo select window triggered.')}
+                    onClick={() => fileInputRef.current?.click()}
                     className="px-4 py-2 rounded-xl border border-cardBorder bg-cardSurface/60 text-xs font-bold text-white hover:bg-cardSurface transition-all"
                   >
                     Change Photo
                   </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleAvatarChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

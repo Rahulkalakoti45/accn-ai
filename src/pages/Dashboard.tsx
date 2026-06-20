@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Coins, 
@@ -21,6 +21,7 @@ import { useToastStore } from '../store/useToastStore';
 import { useTheme } from '../utils/theme';
 import { EnergyFlow3D } from '../components/EnergyFlow3D';
 import { motion } from 'framer-motion';
+import { uploadFile } from '../utils/supabase';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -40,15 +41,40 @@ export const Dashboard: React.FC = () => {
     updateLeaderboard();
   }, [walletCredits, updateLeaderboard]);
 
+  const billInputRef = useRef<HTMLInputElement>(null);
+
   const handleUploadBill = () => {
-    addToast('info', 'File Upload', 'Connecting utility database and scanning energy signatures...');
+    billInputRef.current?.click();
+  };
+
+  const handleBillFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    addToast('info', 'Uploading...', `Uploading ${file.name} to secure storage & scanning energy signatures.`);
+    const userId = user.id || 'mock';
+    const filePath = `bills/${userId}/${Date.now()}-${file.name}`;
+    
+    try {
+      const publicUrl = await uploadFile('accn-assets', filePath, file);
+      if (publicUrl) {
+        addToast('success', 'Upload Successful', 'File safely stored in Supabase storage.');
+      } else {
+        throw new Error('Upload returned empty URL');
+      }
+    } catch (err) {
+      console.warn('Supabase bill upload failed, proceeding offline:', err);
+      addToast('warning', 'Local Preview', 'File processed locally (offline fallback mode).');
+    }
+
+    // Simulate AI scanning and credit generation
     setTimeout(() => {
-      // Generate some credits
       const amt = parseFloat((Math.random() * 5 + 1).toFixed(2));
       mintCredits(amt, 'Solar Billing');
       addToast('success', 'AI Verification Complete', `Successfully verified carbon offset of ${amt} CR from solar export.`);
     }, 1500);
   };
+
 
   const handleDownloadReport = () => {
     addToast('info', 'Report Generation', 'Preparing carbon compliance portfolio details...');
@@ -362,6 +388,13 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-semibold text-textPrimary">Upload Bill</span>
             <span className="text-[9px] text-textSecondary mt-0.5">Scan utility offsets</span>
           </button>
+          <input
+            type="file"
+            ref={billInputRef}
+            onChange={handleBillFileChange}
+            accept=".pdf,image/*"
+            className="hidden"
+          />
 
           <button
             onClick={() => navigate('/ai-assistant')}

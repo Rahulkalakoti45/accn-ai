@@ -137,7 +137,30 @@ export const useStore = create<AppState>((set, get) => ({
     kycVerified: true,
     location: 'Hyderabad, India',
   },
-  updateUser: (fields) => set((state) => ({ user: { ...state.user, ...fields } })),
+  updateUser: (fields) => {
+    set((state) => ({ user: { ...state.user, ...fields } }));
+    const currentUserId = get().user.id;
+    if (currentUserId && !currentUserId.includes('mock')) {
+      const dbPayload: Record<string, any> = {};
+      if (fields.name !== undefined) dbPayload.name = fields.name;
+      if (fields.location !== undefined) dbPayload.location = fields.location;
+      if (fields.avatarUrl !== undefined) dbPayload.avatar_url = fields.avatarUrl;
+      if (fields.trustScore !== undefined) dbPayload.trust_score = fields.trustScore;
+      if (fields.kycVerified !== undefined) dbPayload.kyc_verified = fields.kycVerified;
+
+      if (Object.keys(dbPayload).length > 0) {
+        supabase
+          .from('profiles')
+          .update(dbPayload)
+          .eq('id', currentUserId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('Failed to sync profile update to Supabase:', error);
+            }
+          });
+      }
+    }
+  },
 
   supabaseActive: false,
 
@@ -232,7 +255,8 @@ export const useStore = create<AppState>((set, get) => ({
               email: profile.email,
               trustScore: profile.trust_score,
               kycVerified: profile.kyc_verified,
-              location: profile.location
+              location: profile.location,
+              avatarUrl: profile.avatar_url
             }
           }));
         }

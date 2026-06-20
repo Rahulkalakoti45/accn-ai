@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   trust_score INTEGER DEFAULT 96,
   kyc_verified BOOLEAN DEFAULT TRUE,
   location TEXT DEFAULT 'Hyderabad, India',
+  avatar_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
