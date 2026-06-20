@@ -321,11 +321,11 @@ Provide precise, direct, and elite answers. If they ask something unrelated to A
 
       const model = currentSession.model || 'openai';
 
-      // 3. API Call (POST request to support large prompts and avoid URL-length limits / WAF blocks)
+      // 3. API Call (POST request using text/plain to avoid CORS preflight options block)
       const response = await fetch('https://text.pollinations.ai/', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'text/plain'
         },
         body: JSON.stringify({
           messages,
