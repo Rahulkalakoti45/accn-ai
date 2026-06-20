@@ -41,8 +41,37 @@ export const Analytics: React.FC = () => {
     return () => clearTimeout(timer);
   }, [timeframe]);
 
-  // Main area chart data (monthly)
-  const chartData = [
+  // Hourly telemetry for the active day
+  const dailyData = [
+    { name: '02:00', Expected: 8, Actual: 6 },
+    { name: '06:00', Expected: 12, Actual: 10 },
+    { name: '10:00', Expected: 22, Actual: 18 },
+    { name: '14:00', Expected: 28, Actual: 22 },
+    { name: '18:00', Expected: 32, Actual: 27 },
+    { name: '22:00', Expected: 18, Actual: 14 }
+  ];
+
+  // Daily telemetry for the active week
+  const weeklyData = [
+    { name: 'Mon', Expected: 130, Actual: 110 },
+    { name: 'Tue', Expected: 140, Actual: 115 },
+    { name: 'Wed', Expected: 135, Actual: 108 },
+    { name: 'Thu', Expected: 145, Actual: 125 },
+    { name: 'Fri', Expected: 150, Actual: 130 },
+    { name: 'Sat', Expected: 115, Actual: 95 },
+    { name: 'Sun', Expected: 105, Actual: 88 }
+  ];
+
+  // Weekly telemetry for the active month
+  const monthlyData = [
+    { name: 'Week 1', Expected: 900, Actual: 780 },
+    { name: 'Week 2', Expected: 950, Actual: 810 },
+    { name: 'Week 3', Expected: 920, Actual: 790 },
+    { name: 'Week 4', Expected: 880, Actual: 720 }
+  ];
+
+  // Monthly telemetry for the active year
+  const yearlyData = [
     { name: 'Jan', Expected: 120, Actual: 110 },
     { name: 'Feb', Expected: 130, Actual: 112 },
     { name: 'Mar', Expected: 125, Actual: 98 },
@@ -54,8 +83,18 @@ export const Analytics: React.FC = () => {
     { name: 'Sep', Expected: 135, Actual: 99 },
     { name: 'Oct', Expected: 130, Actual: 104 },
     { name: 'Nov', Expected: 120, Actual: 98 },
-    { name: 'Dec', Expected: 115, Actual: 95 },
+    { name: 'Dec', Expected: 115, Actual: 95 }
   ];
+
+  const getChartData = () => {
+    switch (timeframe) {
+      case 'daily': return dailyData;
+      case 'weekly': return weeklyData;
+      case 'monthly': return monthlyData;
+      case 'yearly': return yearlyData;
+      default: return yearlyData;
+    }
+  };
 
   // Device breakdown data
   const pieData = [
@@ -175,7 +214,7 @@ export const Analytics: React.FC = () => {
         {/* Recharts Area Chart */}
         <div className="w-full h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorExpected" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#00D4FF" stopOpacity={0.15}/>
