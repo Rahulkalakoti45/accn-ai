@@ -16,6 +16,7 @@ import { useStore, Activity } from '../store/useStore';
 import { useToastStore } from '../store/useToastStore';
 import { useTheme } from '../utils/theme';
 import { motion, AnimatePresence } from 'framer-motion';
+import { jsPDF } from 'jspdf';
 
 export const Certificates: React.FC = () => {
   const theme = useTheme();
@@ -29,148 +30,158 @@ export const Certificates: React.FC = () => {
   const certificates = transactionHistory.filter((tx) => tx.type === 'mint');
 
   const downloadCertificateAsPDF = (cert: Activity) => {
-    const hashId = `ACCN-2024-${cert.id.substring(3, 8).toUpperCase()}`;
-    const amountStr = cert.amount || '0';
-    const amountVal = amountStr.includes(' ') ? amountStr.split(' ')[0] : amountStr;
-    const co2Offset = Math.round(parseFloat(amountVal) * 3.7) || 0;
+    try {
+      const hashId = `ACCN-2024-${cert.id.substring(3, 8).toUpperCase()}`;
+      const amountStr = cert.amount || '0';
+      const amountVal = amountStr.includes(' ') ? amountStr.split(' ')[0] : amountStr;
+      const co2Offset = Math.round(parseFloat(amountVal) * 3.7) || 0;
 
-    // Create a hidden iframe to print
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
+      // Landscape A5 (210mm x 148mm)
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a5'
+      });
 
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!doc) return;
+      // 1. Draw Background (Void color #080C14)
+      doc.setFillColor(8, 12, 20);
+      doc.rect(0, 0, 210, 148, 'F');
 
-    doc.write(`
-      <html>
-        <head>
-          <title>${hashId}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
-            body {
-              font-family: 'DM Sans', sans-serif;
-              background-color: #080C14;
-              color: #F0F4FF;
-              margin: 0;
-              padding: 40px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              height: 100vh;
-              box-sizing: border-box;
-            }
-            .certificate-border {
-              border: 4px double #7B4FFF;
-              padding: 40px;
-              width: 100%;
-              max-width: 650px;
-              height: 450px;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              background-color: #1A2235;
-              border-radius: 16px;
-              box-shadow: 0 0 30px rgba(123, 79, 255, 0.15);
-              position: relative;
-              box-sizing: border-box;
-            }
-            .corner-t-l { position: absolute; top: 12px; left: 12px; width: 15px; height: 15px; border-top: 2px solid #7B4FFF; border-left: 2px solid #7B4FFF; }
-            .corner-t-r { position: absolute; top: 12px; right: 12px; width: 15px; height: 15px; border-top: 2px solid #7B4FFF; border-right: 2px solid #7B4FFF; }
-            .corner-b-l { position: absolute; bottom: 12px; left: 12px; width: 15px; height: 15px; border-bottom: 2px solid #7B4FFF; border-left: 2px solid #7B4FFF; }
-            .corner-b-r { position: absolute; bottom: 12px; right: 12px; width: 15px; height: 15px; border-bottom: 2px solid #7B4FFF; border-right: 2px solid #7B4FFF; }
-            
-            .header { text-align: center; }
-            .header span { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #7B4FFF; letter-spacing: 4px; font-weight: bold; text-transform: uppercase; }
-            .header h3 { font-size: 14px; font-family: 'JetBrains Mono', monospace; color: #ffffff; letter-spacing: 2px; margin: 8px 0 0 0; }
-            
-            .content { text-align: center; margin: 25px 0; }
-            .content .amount { font-size: 40px; font-weight: bold; font-family: 'JetBrains Mono', monospace; color: #00E5A0; margin: 0; }
-            .content .label { font-size: 10px; color: #a0aec0; letter-spacing: 2px; text-transform: uppercase; margin-top: 5px; }
-            .content .desc { font-size: 12px; color: #e2e8f0; margin-top: 15px; line-height: 1.6; }
-            
-            .footer { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; }
-            .footer-left { display: flex; align-items: center; gap: 15px; }
-            .footer-right { text-align: right; font-family: 'JetBrains Mono', monospace; }
-            .footer-right .signed { font-size: 10px; color: #00E5A0; font-weight: bold; }
-            .footer-right .hash { font-size: 8px; color: #718096; margin-top: 3px; }
-            
-            .qr-placeholder {
-              width: 50px;
-              height: 50px;
-              background-color: rgba(255, 255, 255, 0.05);
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              border-radius: 8px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              color: #ffffff;
-              font-size: 8px;
-              font-family: 'JetBrains Mono', monospace;
-            }
-            
-            @media print {
-              body { background: #ffffff !important; color: #000000 !important; padding: 0; }
-              .certificate-border { background: #ffffff !important; border-color: #000000 !important; box-shadow: none !important; color: #000000 !important; }
-              .header h3, .content .amount, .footer-right .signed { color: #000000 !important; }
-              .header span, .corner-t-l, .corner-t-r, .corner-b-l, .corner-b-r { border-color: #000000 !important; color: #000000 !important; }
-              .content .desc, .content .label { color: #333333 !important; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="certificate-border">
-            <div class="corner-t-l"></div>
-            <div class="corner-t-r"></div>
-            <div class="corner-b-l"></div>
-            <div class="corner-b-r"></div>
-            
-            <div class="header">
-              <span>Carbon Offset Asset</span>
-              <h3>${hashId}</h3>
-            </div>
-            
-            <div class="content">
-              <div class="amount">${amountVal} CARBON CREDITS</div>
-              <div class="label">Equivalent to ${co2Offset} kg CO₂ offset</div>
-              <div class="desc">
-                This document certifies that <strong>${amountVal} Carbon Credits</strong> have been successfully 
-                minted on the AI Carbon Credit Network (ACCN) Registry. Verified via Smart Grid 
-                telemetry sync by owner <strong>${user.name}</strong>.
-              </div>
-            </div>
-            
-            <div class="footer">
-              <div class="footer-left">
-                <div class="qr-placeholder">ACCN QR</div>
-                <div style="font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #718096; text-align: left;">
-                  MINT HASH: 0x8a92f...724521<br>
-                  VALIDITY: DEC 2026 REG REVIEW
-                </div>
-              </div>
-              <div class="footer-right">
-                <div class="signed">✓ Signed by ARIA AI</div>
-                <div class="hash">SHA256: 3a921d...45bd8821</div>
-              </div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() {
-                window.parent.document.body.removeChild(window.frameElement);
-              }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    doc.close();
+      // 2. Draw Borders (Gold color #D97706)
+      doc.setDrawColor(217, 119, 6);
+      doc.setLineWidth(0.5);
+      doc.rect(5, 5, 200, 138, 'S'); // Outer border
+      doc.rect(6.5, 6.5, 197, 135, 'S'); // Inner double border
+
+      // Draw corner brackets
+      doc.setLineWidth(1.5);
+      // Top Left
+      doc.line(4, 4, 12, 4);
+      doc.line(4, 4, 4, 12);
+      // Top Right
+      doc.line(206, 4, 198, 4);
+      doc.line(206, 4, 206, 12);
+      // Bottom Left
+      doc.line(4, 144, 12, 144);
+      doc.line(4, 144, 4, 136);
+      // Bottom Right
+      doc.line(206, 144, 198, 144);
+      doc.line(206, 144, 206, 136);
+
+      // 3. Header text
+      doc.setTextColor(217, 119, 6); // Gold
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text('AI CARBON CREDIT NETWORK', 105, 18, { align: 'center' });
+
+      doc.setDrawColor(217, 119, 6);
+      doc.setLineWidth(0.2);
+      doc.line(95, 21, 115, 21);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.text('CARBON CREDIT CERTIFICATE', 105, 28, { align: 'center' });
+
+      // 4. Body Content
+      doc.setTextColor(160, 174, 192); // Grey
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.text('This documents and certifies that', 105, 42, { align: 'center' });
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.text(user.name.toUpperCase(), 105, 52, { align: 'center' });
+
+      doc.setTextColor(160, 174, 192);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('has successfully generated and holds total verified ownership of', 105, 62, { align: 'center' });
+
+      doc.setTextColor(0, 229, 160); // Plasma green
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text(`${amountVal} CARBON CREDITS`, 105, 75, { align: 'center' });
+
+      doc.setTextColor(113, 128, 150);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Equivalent to ${co2Offset} kg CO2 emissions offset`, 105, 82, { align: 'center' });
+
+      // 5. Details Section
+      doc.setDrawColor(30, 41, 59); // divider
+      doc.setLineWidth(0.3);
+      doc.line(20, 90, 190, 90);
+      doc.line(20, 115, 190, 115);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      
+      // Column 1
+      doc.setTextColor(113, 128, 150);
+      doc.text('CERTIFICATE ID:', 25, 96);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(hashId, 25, 102);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(113, 128, 150);
+      doc.text('ENERGY VECTOR:', 25, 108);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Solar Smart telemetry', 25, 112);
+
+      // Column 2
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(113, 128, 150);
+      doc.text('TRUST RATING:', 85, 96);
+      doc.setTextColor(0, 229, 160); // Green
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${user.trustScore}% Verified`, 85, 102);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(113, 128, 150);
+      doc.text('ISSUED DATE:', 85, 108);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(cert.timestamp.split(',')[0], 85, 112);
+
+      // Column 3 - Signatures
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(113, 128, 150);
+      doc.text('ACCN BLOCK ADDRESS:', 135, 96);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text((user.walletAddress || '0x7aA2568F3dE904724521').substring(0, 14) + '...', 135, 102);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(113, 128, 150);
+      doc.text('VALIDITY STATUS:', 135, 108);
+      doc.setTextColor(0, 229, 160);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REGISTRY VERIFIED', 135, 112);
+
+      // 6. Signatures Footer
+      doc.setTextColor(0, 229, 160);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text('Signed by ARIA AI', 190, 125, { align: 'right' });
+
+      doc.setTextColor(113, 128, 150);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.text('SHA256: 3a921d0fbc872a0f8c32...45bd8821', 190, 130, { align: 'right' });
+
+      doc.text('MINT HASH: 0x8a92f91a0c4d2724521', 20, 125);
+      doc.text('REGISTRY: DEC 2026 AUDIT REVIEW', 20, 130);
+
+      // Save PDF file directly (triggers immediate download)
+      doc.save(`${hashId}.pdf`);
+      addToast('success', 'PDF Saved', `Certificate ${hashId}.pdf downloaded successfully.`);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      addToast('error', 'PDF Generation Failed', 'Unable to create PDF file.');
+    }
   };
 
   const handleAction = (action: string, cert?: Activity) => {
