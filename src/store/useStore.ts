@@ -75,7 +75,7 @@ interface AppState {
     location: string;
     avatarUrl?: string;
   };
-  updateUser: (fields: Partial<AppState['user']>) => void;
+  updateUser: (fields: Partial<AppState['user']>) => Promise<boolean>;
 
   // Connection status
   supabaseActive: boolean;
@@ -137,7 +137,7 @@ export const useStore = create<AppState>((set, get) => ({
     kycVerified: true,
     location: 'Hyderabad, India',
   },
-  updateUser: (fields) => {
+  updateUser: async (fields) => {
     set((state) => ({ user: { ...state.user, ...fields } }));
     const currentUserId = get().user.id;
     if (currentUserId && !currentUserId.includes('mock')) {
@@ -149,17 +149,23 @@ export const useStore = create<AppState>((set, get) => ({
       if (fields.kycVerified !== undefined) dbPayload.kyc_verified = fields.kycVerified;
 
       if (Object.keys(dbPayload).length > 0) {
-        supabase
-          .from('profiles')
-          .update(dbPayload)
-          .eq('id', currentUserId)
-          .then(({ error }) => {
-            if (error) {
-              console.error('Failed to sync profile update to Supabase:', error);
-            }
-          });
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update(dbPayload)
+            .eq('id', currentUserId);
+          if (error) {
+            console.error('Failed to sync profile update to Supabase:', error);
+            return false;
+          }
+          return true;
+        } catch (err) {
+          console.error('Failed to sync profile update:', err);
+          return false;
+        }
       }
     }
+    return true;
   },
 
   supabaseActive: false,

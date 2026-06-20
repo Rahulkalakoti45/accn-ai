@@ -76,10 +76,15 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleProfileSave = (e: React.FormEvent) => {
+  const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateUser({ name, location: loc });
-    addToast('success', 'Profile Saved', 'Personal information registry updated.');
+    addToast('info', 'Saving...', 'Saving changes to database.');
+    const success = await updateUser({ name, location: loc });
+    if (success) {
+      addToast('success', 'Profile Saved', 'Personal information registry updated.');
+    } else {
+      addToast('error', 'Save Failed', 'Failed to synchronize details to database.');
+    }
   };
 
   const handlePairDevice = (e: React.FormEvent) => {
