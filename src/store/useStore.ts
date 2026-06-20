@@ -126,7 +126,7 @@ export const useStore = create<AppState>((set, get) => ({
   themeColor: 'green',
   setThemeColor: (themeColor) => set({ themeColor }),
 
-  isAuthenticated: true,
+  isAuthenticated: false,
   setIsAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
   user: {
     id: 'राहुल-कुमार-mock-uuid',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   BarChart3, 
@@ -13,10 +13,13 @@ import {
   Settings, 
   ChevronLeft, 
   ChevronRight,
-  Lock
+  Lock,
+  LogOut
 } from 'lucide-react';
 import { useTheme } from '../utils/theme';
 import { motion } from 'framer-motion';
+import { supabase } from '../utils/supabase';
+import { useStore } from '../store/useStore';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -25,6 +28,14 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const setIsAuthenticated = useStore((state) => state.setIsAuthenticated);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    navigate('/auth');
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -117,6 +128,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed })
             </span>
           )}
         </NavLink>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3.5 px-3 py-3.5 rounded-xl text-sm font-medium text-textSecondary hover:text-danger hover:bg-danger/5 border border-transparent w-full text-left cursor-pointer group mt-2"
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0 group-hover:text-danger transition-colors" />
+          {!isCollapsed && (
+            <motion.span
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              Logout
+            </motion.span>
+          )}
+        </button>
       </nav>
 
       {/* Collapse / Expand Toggle Button */}
