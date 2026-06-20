@@ -307,25 +307,30 @@ Provide precise, direct, and elite answers. If they ask something unrelated to A
     setSpeaking(false);
 
     try {
-      // 2. Build conversation history as text for GET request
-      // Limit to last 8 messages for context safety and URL length constraints
       const systemPrompt = buildSystemPrompt();
-      const recentMessages = sessionWithUserMsg.messages.slice(-8);
-      const conversationContext = recentMessages.map(m => {
-        return `${m.sender === 'user' ? 'User' : 'ARIA'}: ${m.text}`;
-      }).join('\n');
+      // Increase message history buffer for richer context memory (up to last 12 messages)
+      const recentMessages = sessionWithUserMsg.messages.slice(-12);
+      
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...recentMessages.map(m => ({
+          role: m.sender === 'user' ? 'user' : 'assistant',
+          content: m.text
+        }))
+      ];
 
-      const fullPrompt = `${conversationContext}\nARIA:`;
-
-      const encodedPrompt = encodeURIComponent(fullPrompt);
-      const encodedSystem = encodeURIComponent(systemPrompt);
       const model = currentSession.model || 'openai';
 
-      const url = `https://text.pollinations.ai/${encodedPrompt}?model=${model}&system=${encodedSystem}`;
-
-      // 3. API Call (GET request to bypass CORS/POST WAF rate limits)
-      const response = await fetch(url, {
-        method: 'GET'
+      // 3. API Call (POST request to support large prompts and avoid URL-length limits / WAF blocks)
+      const response = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages,
+          model
+        })
       });
 
       if (!response.ok) {
