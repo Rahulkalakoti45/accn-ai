@@ -146,10 +146,9 @@ export const AuthPage: React.FC = () => {
   };
 
   // Perform a real login/signup flow under the hood using a password wrapper so database sync stays intact
-  const handleSilentGoogleLogin = async (selectedEmail: string) => {
+  const handleSilentGoogleLogin = async (selectedEmail: string, selectedName: string) => {
     setIsLoading(true);
     const mockPassword = 'ACCN-Google-OAuth-Fallback-Pass-9988!';
-    const derivedName = selectedEmail.split('@')[0].toUpperCase();
 
     try {
       // 1. Try to sign in
@@ -166,7 +165,7 @@ export const AuthPage: React.FC = () => {
             password: mockPassword,
             options: {
               data: {
-                name: derivedName
+                name: selectedName
               }
             }
           });
@@ -183,7 +182,7 @@ export const AuthPage: React.FC = () => {
             // Insert profile details
             await supabase.from('profiles').insert({
               id: userId,
-              name: derivedName,
+              name: selectedName,
               email: selectedEmail,
               trust_score: 96,
               kyc_verified: true,
@@ -451,34 +450,68 @@ export const AuthPage: React.FC = () => {
               {/* Accounts list */}
               <div className="flex flex-col gap-2.5 mt-2">
                 <button
-                  onClick={() => handleSilentGoogleLogin('rahulkalakoti@gmail.com')}
+                  onClick={() => handleSilentGoogleLogin('vishureddyrockzz@gmail.com', 'Learn with Vishu')}
                   disabled={isLoading}
                   className="w-full p-3 rounded-xl border border-cardBorder bg-cardSurface/10 hover:bg-cardSurface/30 text-left flex items-center justify-between transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-accentGreen/15 border border-accentGreen/30 text-accentGreen flex items-center justify-center font-bold text-xs uppercase select-none">
-                      RK
+                      LV
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-white">Rahul Kalakoti</h4>
-                      <p className="text-[9px] text-textSecondary">rahulkalakoti@gmail.com</p>
+                      <h4 className="text-xs font-bold text-white">Learn with Vishu</h4>
+                      <p className="text-[9px] text-textSecondary">vishureddyrockzz@gmail.com</p>
                     </div>
                   </div>
-                  <Check className="w-3.5 h-3.5 text-accentGreen opacity-60" />
+                  <Check className="w-3.5 h-3.5 text-accentGreen opacity-0" />
                 </button>
 
                 <button
-                  onClick={() => handleSilentGoogleLogin('rahul@example.com')}
+                  onClick={() => handleSilentGoogleLogin('vishhhhhh12@gmail.com', 'Vishwanath Reddy')}
                   disabled={isLoading}
                   className="w-full p-3 rounded-xl border border-cardBorder bg-cardSurface/10 hover:bg-cardSurface/30 text-left flex items-center justify-between transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-accentCyan/15 border border-accentCyan/30 text-accentCyan flex items-center justify-center font-bold text-xs uppercase select-none">
-                      R
+                      VR
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-white">Rahul K.</h4>
-                      <p className="text-[9px] text-textSecondary">rahul@example.com</p>
+                      <h4 className="text-xs font-bold text-white">Vishwanath Reddy</h4>
+                      <p className="text-[9px] text-textSecondary">vishhhhhh12@gmail.com</p>
+                    </div>
+                  </div>
+                  <Check className="w-3.5 h-3.5 text-accentGreen opacity-0" />
+                </button>
+
+                <button
+                  onClick={() => handleSilentGoogleLogin('b23in040@kitsw.ac.in', 'VISHWANATH REDDY')}
+                  disabled={isLoading}
+                  className="w-full p-3 rounded-xl border border-cardBorder bg-cardSurface/10 hover:bg-cardSurface/30 text-left flex items-center justify-between transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-accentPurple/15 border border-accentPurple/30 text-accentPurple flex items-center justify-center font-bold text-xs uppercase select-none">
+                      VR
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white">VISHWANATH REDDY</h4>
+                      <p className="text-[9px] text-textSecondary">b23in040@kitsw.ac.in</p>
+                    </div>
+                  </div>
+                  <Check className="w-3.5 h-3.5 text-accentGreen opacity-0" />
+                </button>
+
+                <button
+                  onClick={() => handleSilentGoogleLogin('haripriyareddy23@gmail.com', 'Haripriya Reddy')}
+                  disabled={isLoading}
+                  className="w-full p-3 rounded-xl border border-cardBorder bg-cardSurface/10 hover:bg-cardSurface/30 text-left flex items-center justify-between transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-accentGold/15 border border-accentGold/30 text-accentGold flex items-center justify-center font-bold text-xs uppercase select-none">
+                      HR
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Haripriya Reddy</h4>
+                      <p className="text-[9px] text-textSecondary">haripriyareddy23@gmail.com</p>
                     </div>
                   </div>
                   <Check className="w-3.5 h-3.5 text-accentGreen opacity-0" />
@@ -505,7 +538,7 @@ export const AuthPage: React.FC = () => {
                       <button
                         onClick={() => {
                           if (customGoogleEmail.includes('@')) {
-                            handleSilentGoogleLogin(customGoogleEmail);
+                            handleSilentGoogleLogin(customGoogleEmail, customGoogleEmail.split('@')[0].toUpperCase());
                           } else {
                             addToast('error', 'Invalid Email', 'Please enter a valid email.');
                           }
