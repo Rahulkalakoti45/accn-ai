@@ -10,7 +10,8 @@ import {
   X, 
   Check, 
   ShoppingBag,
-  Sparkles
+  Sparkles,
+  Plus
 } from 'lucide-react';
 import { useStore, Listing } from '../store/useStore';
 import { useToastStore } from '../store/useToastStore';
@@ -23,11 +24,15 @@ export const Marketplace: React.FC = () => {
   const theme = useTheme();
   const { addToast } = useToastStore();
   const { 
+    user,
     marketplaceListings, 
     liveFeed, 
     addLiveFeed, 
     buyCredits, 
-    walletBalance 
+    removeListing,
+    addListing,
+    walletBalance,
+    walletCredits
   } = useStore();
 
   // Filters State
@@ -45,6 +50,13 @@ export const Marketplace: React.FC = () => {
   const [confirming, setConfirming] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
 
+  // Sell Modal State
+  const [isSellOpen, setIsSellOpen] = useState(false);
+  const [sellCreditsQty, setSellCreditsQty] = useState('5');
+  const [sellEnergyType, setSellEnergyType] = useState<'Solar' | 'Wind' | 'Hydro' | 'Home Solar'>('Solar');
+  const [sellPrice, setSellPrice] = useState('120');
+  const [listingInProgress, setListingInProgress] = useState(false);
+
   // Insert mock ticker updates dynamically
   useEffect(() => {
     const buyers = ['Tata Steel', 'Reliance Industries', 'ITC Ltd', 'NTPC', 'Adani Green', 'Wipro ESG', 'Infosys Eco'];
@@ -60,6 +72,7 @@ export const Marketplace: React.FC = () => {
 
     return () => clearInterval(tickerInterval);
   }, [addLiveFeed]);
+
 
   // Apply filters
   const filteredListings = marketplaceListings.filter((l) => {
@@ -80,22 +93,17 @@ export const Marketplace: React.FC = () => {
     setPurchaseSuccess(false);
   };
 
-  const handleConfirmPurchase = () => {
+  const handleConfirmPurchase = async () => {
     if (!selectedListing) return;
     setConfirming(true);
 
-    setTimeout(() => {
-      buyCredits(selectedListing.credits, selectedListing.seller, selectedListing.pricePerCredit);
-      
-      // Remove listing from store
-      useStore.setState((state) => ({
-        marketplaceListings: state.marketplaceListings.filter((l) => l.id !== selectedListing.id)
-      }));
+    try {
+      await buyCredits(selectedListing.credits, selectedListing.seller, selectedListing.pricePerCredit);
+      await removeListing(selectedListing.id);
 
       setConfirming(false);
       setPurchaseSuccess(true);
 
-      // Trigger Confetti
       confetti({
         particleCount: 100,
         spread: 70,
@@ -103,7 +111,56 @@ export const Marketplace: React.FC = () => {
       });
 
       addToast('success', 'Purchase Confirmed', `Successfully acquired ${selectedListing.credits} credits.`);
-    }, 1500);
+    } catch (e) {
+      console.error(e);
+      addToast('error', 'Purchase Failed', 'Failed to process purchase transaction.');
+      setConfirming(false);
+    }
+  };
+
+  const handleCreateListing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = parseFloat(sellCreditsQty);
+    const price = parseFloat(sellPrice);
+
+    if (isNaN(qty) || qty <= 0) {
+      addToast('error', 'Invalid Input', 'Please enter a valid credit quantity.');
+      return;
+    }
+    if (qty > walletCredits) {
+      addToast('error', 'Insufficient Credits', `You only have ${walletCredits} CR available to list.`);
+      return;
+    }
+    if (isNaN(price) || price <= 0) {
+      addToast('error', 'Invalid Price', 'Please enter a valid price per credit.');
+      return;
+    }
+
+    setListingInProgress(true);
+    try {
+      await addListing({
+        seller: user.name || 'Anonymous User',
+        location: user.location || 'India',
+        trustScore: user.trustScore || 96,
+        credits: qty,
+        energyType: sellEnergyType,
+        pricePerCredit: price,
+        verified: user.kycVerified
+      });
+
+      useStore.setState((state) => ({
+        walletCredits: Number((state.walletCredits - qty).toFixed(2))
+      }));
+
+      addLiveFeed(`🌿 ${user.name} listed ${qty} ${sellEnergyType} credits @ ₹${price}`);
+      addToast('success', 'Credits Listed', `Successfully listed ${qty} credits on the marketplace.`);
+      setIsSellOpen(false);
+    } catch (err) {
+      console.error(err);
+      addToast('error', 'Listing Failed', 'Failed to create marketplace listing.');
+    } finally {
+      setListingInProgress(false);
+    }
   };
 
   return (
@@ -118,6 +175,14 @@ export const Marketplace: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-4 text-xs font-mono">
+          <button
+            onClick={() => setIsSellOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-accentGold/30 bg-accentGold/10 text-accentGold hover:bg-accentGold hover:text-bgSpace transition-all font-sans font-bold text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            List Credits
+          </button>
+          <div className="h-6 w-px bg-cardBorder" />
           <div className="text-right">
             <span className="text-textSecondary block">Index Price</span>
             <span className="font-bold text-accentGreen">&uarr; ₹120.4 (+3.5%)</span>
@@ -403,6 +468,96 @@ export const Marketplace: React.FC = () => {
                   </div>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+
+        {/* Sell Credits Modal */}
+        {isSellOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+              onClick={() => setIsSellOpen(false)}
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl border border-cardBorder bg-bgMidnight p-6 relative overflow-hidden z-10 glass-panel"
+            >
+              {/* Decoration glows */}
+              <div className="absolute -top-12 -right-12 w-24 h-24 bg-accentGold/10 rounded-full blur-2xl pointer-events-none" />
+
+              <h3 className="text-sm font-bold text-white font-heading uppercase tracking-wider mb-4 border-b border-cardBorder pb-2 flex justify-between items-center">
+                <span>List Carbon Credits</span>
+                <button onClick={() => setIsSellOpen(false)} className="text-textMuted hover:text-white transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </h3>
+
+              <form onSubmit={handleCreateListing} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-textSecondary uppercase tracking-wider">Credits Quantity (CR)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={sellCreditsQty}
+                    onChange={(e) => setSellCreditsQty(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl glass-input text-xs"
+                    required
+                  />
+                  <span className="text-[9px] text-textMuted font-mono">Available: {walletCredits} CR</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-textSecondary uppercase tracking-wider">Energy Generation Source</label>
+                  <select
+                    value={sellEnergyType}
+                    onChange={(e) => setSellEnergyType(e.target.value as any)}
+                    className="px-4 py-2.5 rounded-xl bg-cardSurface/60 border border-cardBorder text-xs text-white"
+                  >
+                    <option value="Solar">Solar</option>
+                    <option value="Wind">Wind</option>
+                    <option value="Hydro">Hydro</option>
+                    <option value="Home Solar">Home Solar</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-textSecondary uppercase tracking-wider">Price per Credit (₹)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={sellPrice}
+                    onChange={(e) => setSellPrice(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl glass-input text-xs"
+                    required
+                  />
+                  <span className="text-[9px] text-textMuted font-mono">Current Index: ₹120.4</span>
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsSellOpen(false)}
+                    className="flex-grow py-3.5 rounded-xl border border-cardBorder bg-cardSurface/30 text-textSecondary hover:text-textPrimary hover:bg-cardSurface/60 text-xs font-bold transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={listingInProgress}
+                    className="flex-grow py-3.5 rounded-xl bg-accentGold text-bgSpace text-xs font-bold hover:scale-102 transition-all shadow-neon-gold"
+                  >
+                    {listingInProgress ? 'Listing...' : 'List Credits'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
