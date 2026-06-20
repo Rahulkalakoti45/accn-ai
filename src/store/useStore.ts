@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../utils/supabase';
 
 export interface Activity {
   id: string;
@@ -65,6 +66,7 @@ interface AppState {
   isAuthenticated: boolean;
   setIsAuthenticated: (val: boolean) => void;
   user: {
+    id?: string;
     name: string;
     email: string;
     walletAddress: string;
@@ -75,19 +77,23 @@ interface AppState {
   };
   updateUser: (fields: Partial<AppState['user']>) => void;
 
+  // Connection status
+  supabaseActive: boolean;
+  initializeStore: () => Promise<void>;
+
   // Wallet
   walletBalance: number;
   walletCredits: number;
   walletAddress: string;
   transactionHistory: Activity[];
-  mintCredits: (amount: number, source: string) => void;
-  sellCredits: (amount: number, buyer: string, price: number) => void;
-  buyCredits: (amount: number, seller: string, price: number) => void;
+  mintCredits: (amount: number, source: string) => Promise<void>;
+  sellCredits: (amount: number, buyer: string, price: number) => Promise<void>;
+  buyCredits: (amount: number, seller: string, price: number) => Promise<void>;
 
   // Marketplace
   marketplaceListings: Listing[];
-  addListing: (listing: Omit<Listing, 'id'>) => void;
-  removeListing: (id: number) => void;
+  addListing: (listing: Omit<Listing, 'id'>) => Promise<void>;
+  removeListing: (id: number) => Promise<void>;
   liveFeed: { id: string; message: string; timestamp: string }[];
   addLiveFeed: (msg: string) => void;
 
@@ -99,8 +105,8 @@ interface AppState {
 
   // Devices
   connectedDevices: SmartMeter[];
-  connectDevice: (device: Omit<SmartMeter, 'status' | 'lastSync'>) => void;
-  disconnectDevice: (id: string) => void;
+  connectDevice: (device: Omit<SmartMeter, 'status' | 'lastSync'>) => Promise<void>;
+  disconnectDevice: (id: string) => Promise<void>;
 
   // AI Chat
   chatMessages: ChatMessage[];
@@ -121,8 +127,9 @@ export const useStore = create<AppState>((set, get) => ({
   setThemeColor: (themeColor) => set({ themeColor }),
 
   isAuthenticated: true,
-  setIsAuthenticated: (val) => set({ isAuthenticated: val }),
+  setIsAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
   user: {
+    id: 'राहुल-कुमार-mock-uuid',
     name: 'Rahul Kumar',
     email: 'rahul@example.com',
     walletAddress: '0x7aA2...4521',
@@ -132,10 +139,13 @@ export const useStore = create<AppState>((set, get) => ({
   },
   updateUser: (fields) => set((state) => ({ user: { ...state.user, ...fields } })),
 
+  supabaseActive: false,
+
   walletBalance: 2450,
   walletCredits: 25.5,
   walletAddress: '0x7aA2568F3dE904724521',
 
+  // Fallback transaction logs
   transactionHistory: [
     {
       id: 'tx-1',
@@ -177,63 +187,256 @@ export const useStore = create<AppState>((set, get) => ({
     },
   ],
 
-  mintCredits: (amount, source) => {
+  initializeStore: async () => {
+    try {
+      // 1. Fetch Marketplace listings from Supabase
+      const { data: listings, error: listErr } = await supabase
+        .from('marketplace_listings')
+        .select('*')
+        .order('id', { ascending: false });
+
+      if (!listErr && listings) {
+        set({ 
+          marketplaceListings: listings.map((l) => ({
+            id: l.id,
+            seller: l.seller,
+            location: l.location,
+            trustScore: l.trust_score,
+            credits: Number(l.credits),
+            energyType: l.energy_type,
+            pricePerCredit: Number(l.price_per_credit),
+            verified: l.verified
+          })),
+          supabaseActive: true
+        });
+      }
+
+      // 2. Fetch logged in session profile & wallet details if exists
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      if (sessionUser) {
+        set({ isAuthenticated: true });
+        
+        // Fetch profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', sessionUser.id)
+          .single();
+
+        if (profile) {
+          set((state) => ({
+            user: {
+              ...state.user,
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              trustScore: profile.trust_score,
+              kycVerified: profile.kyc_verified,
+              location: profile.location
+            }
+          }));
+        }
+
+        // Fetch wallet
+        const { data: wallet } = await supabase
+          .from('wallets')
+          .select('*')
+          .eq('user_id', sessionUser.id)
+          .single();
+
+        if (wallet) {
+          set({
+            walletBalance: Number(wallet.balance),
+            walletCredits: Number(wallet.credits),
+            walletAddress: wallet.address
+          });
+        }
+
+        // Fetch transactions
+        const { data: txs } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', sessionUser.id)
+          .order('created_at', { ascending: false });
+
+        if (txs) {
+          set({
+            transactionHistory: txs.map((t) => ({
+              id: t.id,
+              type: t.type,
+              title: t.title,
+              description: t.description,
+              timestamp: t.timestamp,
+              amount: t.amount,
+              linkText: t.link_text,
+              linkUrl: t.link_url
+            }))
+          });
+        }
+
+        // Fetch devices
+        const { data: devs } = await supabase
+          .from('devices')
+          .select('*')
+          .eq('user_id', sessionUser.id);
+
+        if (devs) {
+          set({
+            connectedDevices: devs.map((d) => ({
+              id: d.id,
+              type: d.type,
+              status: d.status,
+              lastSync: d.last_sync
+            }))
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase initialization failed, running offline mock state.', e);
+    }
+  },
+
+  mintCredits: async (amount, source) => {
+    const timestamp = 'Just Now';
     const newTx: Activity = {
       id: `tx-${Date.now()}`,
       type: 'mint',
       title: 'Credits Minted',
       description: `+${amount} carbon credits from ${source} verification`,
-      timestamp: 'Just Now',
+      timestamp,
       amount: `+${amount} CR`,
       linkText: 'View Certificate',
       linkUrl: '#',
     };
+
     set((state) => ({
       walletCredits: Number((state.walletCredits + amount).toFixed(2)),
-      co2Saved: Number((state.co2Saved + amount * 3.7).toFixed(1)), // 1 credit = 3.7 kg CO2 offset roughly (custom conversion)
+      co2Saved: Number((state.co2Saved + amount * 3.7).toFixed(1)),
       transactionHistory: [newTx, ...state.transactionHistory],
     }));
+
     get().addNotification('credits', 'Credits Minted Successfully', `Generated +${amount} CR from ${source}.`);
+
+    // Sync to Supabase if authenticated
+    try {
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      if (sessionUser) {
+        // 1. Insert transaction log
+        await supabase.from('transactions').insert({
+          user_id: sessionUser.id,
+          type: 'mint',
+          title: 'Credits Minted',
+          description: `+${amount} carbon credits from ${source} verification`,
+          amount: `+${amount} CR`,
+          timestamp,
+          link_text: 'View Certificate',
+          link_url: '#'
+        });
+
+        // 2. Update wallet balance values
+        await supabase.from('wallets')
+          .update({ credits: get().walletCredits })
+          .eq('user_id', sessionUser.id);
+      }
+    } catch (err) {
+      console.warn('Offline: failed to sync minted credits to Supabase.', err);
+    }
   },
 
-  sellCredits: (amount, buyer, price) => {
+  sellCredits: async (amount, buyer, price) => {
     const value = amount * price;
+    const timestamp = 'Just Now';
     const newTx: Activity = {
       id: `tx-${Date.now()}`,
       type: 'sell',
       title: 'Credits Sold',
       description: `${amount} credits sold @ ₹${price} each to ${buyer}`,
-      timestamp: 'Just Now',
+      timestamp,
       amount: `+₹${value}`,
       linkText: 'View Transaction',
       linkUrl: '#',
     };
+
     set((state) => ({
       walletCredits: Number((state.walletCredits - amount).toFixed(2)),
       walletBalance: state.walletBalance + value,
       transactionHistory: [newTx, ...state.transactionHistory],
     }));
+
     get().addNotification('marketplace', 'Credits Sold', `Sold ${amount} CR to ${buyer} for ₹${value}.`);
+
+    try {
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      if (sessionUser) {
+        await supabase.from('transactions').insert({
+          user_id: sessionUser.id,
+          type: 'sell',
+          title: 'Credits Sold',
+          description: `${amount} credits sold @ ₹${price} each to ${buyer}`,
+          amount: `+₹${value}`,
+          timestamp,
+          link_text: 'View Transaction',
+          link_url: '#'
+        });
+
+        await supabase.from('wallets')
+          .update({ 
+            credits: get().walletCredits,
+            balance: get().walletBalance
+          })
+          .eq('user_id', sessionUser.id);
+      }
+    } catch (err) {
+      console.warn('Offline: failed to sync sold credits to Supabase.', err);
+    }
   },
 
-  buyCredits: (amount, seller, price) => {
+  buyCredits: async (amount, seller, price) => {
     const value = amount * price;
+    const timestamp = 'Just Now';
     const newTx: Activity = {
       id: `tx-${Date.now()}`,
       type: 'buy',
       title: 'Credits Purchased',
       description: `Bought ${amount} credits @ ₹${price} from ${seller}`,
-      timestamp: 'Just Now',
+      timestamp,
       amount: `-${amount} CR`,
       linkText: 'View Details',
       linkUrl: '#',
     };
+
     set((state) => ({
       walletCredits: Number((state.walletCredits + amount).toFixed(2)),
       walletBalance: state.walletBalance - value,
       transactionHistory: [newTx, ...state.transactionHistory],
     }));
+
     get().addNotification('marketplace', 'Purchase Successful', `Purchased ${amount} CR from ${seller} for ₹${value}.`);
+
+    try {
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      if (sessionUser) {
+        await supabase.from('transactions').insert({
+          user_id: sessionUser.id,
+          type: 'buy',
+          title: 'Credits Purchased',
+          description: `Bought ${amount} credits @ ₹${price} from ${seller}`,
+          amount: `-${amount} CR`,
+          timestamp,
+          link_text: 'View Details',
+          link_url: '#'
+        });
+
+        await supabase.from('wallets')
+          .update({ 
+            credits: get().walletCredits,
+            balance: get().walletBalance
+          })
+          .eq('user_id', sessionUser.id);
+      }
+    } catch (err) {
+      console.warn('Offline: failed to sync bought credits to Supabase.', err);
+    }
   },
 
   marketplaceListings: [
@@ -245,16 +448,42 @@ export const useStore = create<AppState>((set, get) => ({
     { id: 6, seller: 'Global Green Corp', location: 'Bangalore', trustScore: 99, credits: 150, energyType: 'Hydro', pricePerCredit: 125, verified: true },
   ],
 
-  addListing: (listing) => set((state) => ({
-    marketplaceListings: [
-      { id: Date.now(), ...listing },
-      ...state.marketplaceListings
-    ]
-  })),
+  addListing: async (listing) => {
+    // Optimistic UI local write
+    const localId = Date.now();
+    set((state) => ({
+      marketplaceListings: [
+        { id: localId, ...listing },
+        ...state.marketplaceListings
+      ]
+    }));
 
-  removeListing: (id) => set((state) => ({
-    marketplaceListings: state.marketplaceListings.filter((l) => l.id !== id)
-  })),
+    try {
+      await supabase.from('marketplace_listings').insert({
+        seller: listing.seller,
+        location: listing.location,
+        trust_score: listing.trustScore,
+        credits: listing.credits,
+        energy_type: listing.energyType,
+        price_per_credit: listing.pricePerCredit,
+        verified: listing.verified
+      });
+    } catch (err) {
+      console.warn('Offline: failed to sync marketplace listing insertion to Supabase.', err);
+    }
+  },
+
+  removeListing: async (id) => {
+    set((state) => ({
+      marketplaceListings: state.marketplaceListings.filter((l) => l.id !== id)
+    }));
+
+    try {
+      await supabase.from('marketplace_listings').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Offline: failed to sync listing deletion to Supabase.', err);
+    }
+  },
 
   liveFeed: [
     { id: '1', message: 'Tata Steel bought 100 credits @ ₹118', timestamp: '2s ago' },
@@ -328,21 +557,45 @@ export const useStore = create<AppState>((set, get) => ({
     { id: 'SP-TATA-8821', type: 'Solar Panel Monitor', status: 'Active', lastSync: '5 mins ago' },
   ],
 
-  connectDevice: (device) => {
+  connectDevice: async (device) => {
+    const timestamp = 'Just Now';
     const newDevice: SmartMeter = {
       ...device,
       status: 'Active',
-      lastSync: 'Just Now',
+      lastSync: timestamp,
     };
     set((state) => ({
       connectedDevices: [...state.connectedDevices, newDevice],
     }));
     get().addNotification('system', 'New Device Paired', `${device.type} (${device.id}) connected.`);
+
+    try {
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      if (sessionUser) {
+        await supabase.from('devices').insert({
+          id: device.id,
+          user_id: sessionUser.id,
+          type: device.type,
+          status: 'Active',
+          last_sync: timestamp
+        });
+      }
+    } catch (err) {
+      console.warn('Offline: failed to sync connected device to Supabase.', err);
+    }
   },
 
-  disconnectDevice: (id) => set((state) => ({
-    connectedDevices: state.connectedDevices.filter((d) => d.id !== id)
-  })),
+  disconnectDevice: async (id) => {
+    set((state) => ({
+      connectedDevices: state.connectedDevices.filter((d) => d.id !== id)
+    }));
+
+    try {
+      await supabase.from('devices').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Offline: failed to delete connected device in Supabase.', err);
+    }
+  },
 
   chatMessages: [
     {
@@ -376,9 +629,8 @@ export const useStore = create<AppState>((set, get) => ({
   ],
 
   updateLeaderboard: () => {
-    // Dynamically adjust user in the list based on state walletCredits
     set((state) => {
-      const userCredits = state.walletCredits + 100; // adding baseline to compete with leaderboard
+      const userCredits = state.walletCredits + 100;
       const updatedList = state.leaderboard.map((item) => {
         if (item.isCurrentUser) {
           return { ...item, credits: Math.round(userCredits), trustScore: state.user.trustScore };
@@ -386,7 +638,6 @@ export const useStore = create<AppState>((set, get) => ({
         return item;
       });
 
-      // Sort by credits descending
       const sorted = [...updatedList].sort((a, b) => b.credits - a.credits);
       const ranked = sorted.map((item, index) => ({ ...item, rank: index + 1 }));
 
@@ -394,6 +645,6 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  co2Saved: 95, // kg
-  targetCO2: 120, // kg
+  co2Saved: 95,
+  targetCO2: 120,
 }));

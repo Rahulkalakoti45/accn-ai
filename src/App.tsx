@@ -20,9 +20,16 @@ import { AdminPortal } from './pages/AdminPortal';
 
 import { useStore } from './store/useStore';
 
+import { useEffect } from 'react';
+
 export const App: React.FC = () => {
   const [loadingComplete, setLoadingComplete] = useState(false);
   const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const initializeStore = useStore((state) => state.initializeStore);
+
+  useEffect(() => {
+    initializeStore();
+  }, [initializeStore]);
 
   if (!loadingComplete) {
     return <Loader onComplete={() => setLoadingComplete(true)} />;

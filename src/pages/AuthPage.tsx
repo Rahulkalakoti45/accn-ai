@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, LogIn, ArrowRight } from 'lucide-react';
 import { ParticleBg } from '../components/ParticleBg';
 import { useStore } from '../store/useStore';
 import { useToastStore } from '../store/useToastStore';
+import { supabase } from '../utils/supabase';
 
 export const AuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ export const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       addToast('error', 'Authentication Failed', 'Please enter both email and password.');
@@ -25,13 +26,78 @@ export const AuthPage: React.FC = () => {
 
     setIsLoading(true);
 
-    // Simulate validation
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // 1. Try to log in
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        // If login fails because user doesn't exist, auto-register them
+        if (error.message.includes('Invalid login credentials')) {
+          addToast('info', 'Registering Account', 'Account not found. Creating a new profile...');
+          
+          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ 
+            email, 
+            password,
+            options: {
+              data: {
+                name: email.split('@')[0],
+              }
+            }
+          });
+
+          if (signUpErr) {
+            addToast('error', 'Registration Failed', signUpErr.message);
+            setIsLoading(false);
+            return;
+          }
+
+          // Populate tables
+          if (signUpData.user) {
+            const userId = signUpData.user.id;
+            
+            // Insert profile
+            await supabase.from('profiles').insert({
+              id: userId,
+              name: email.split('@')[0],
+              email: email,
+              trust_score: 96,
+              kyc_verified: true,
+              location: 'Hyderabad, India'
+            });
+            
+            // Insert wallet
+            const walletAddr = '0x' + Math.random().toString(36).substring(2, 10).toUpperCase() + '...' + Math.random().toString(36).substring(2, 6).toUpperCase();
+            await supabase.from('wallets').insert({
+              user_id: userId,
+              address: walletAddr,
+              balance: 2450.0,
+              credits: 25.5
+            });
+
+            addToast('success', 'Onboarding Complete', 'Created account and generated new carbon wallet.');
+            setIsAuthenticated(true);
+            await useStore.getState().initializeStore();
+            navigate('/dashboard');
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        addToast('error', 'Authentication Failed', error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      // Successful login
+      addToast('success', 'Welcome Back!', 'Successfully authenticated via Supabase.');
       setIsAuthenticated(true);
-      addToast('success', 'Welcome Back!', 'Successfully authenticated as Rahul Kumar.');
+      await useStore.getState().initializeStore();
       navigate('/dashboard');
-    }, 1200);
+    } catch (err: any) {
+      addToast('error', 'Authentication Failed', err.message || 'An unexpected error occurred.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSocialLogin = (provider: string) => {
