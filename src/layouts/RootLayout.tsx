@@ -39,6 +39,34 @@ export const RootLayout: React.FC = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // Implement the Antigravity Plasma Cursor Trail
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const cards = document.querySelectorAll('.glass-panel');
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        (card as HTMLElement).style.setProperty('--mouse-x', `${x}px`);
+        (card as HTMLElement).style.setProperty('--mouse-y', `${y}px`);
+
+        // Check if cursor is within 200px radius of card boundaries
+        const isNear = 
+          e.clientX >= rect.left - 200 &&
+          e.clientX <= rect.right + 200 &&
+          e.clientY >= rect.top - 200 &&
+          e.clientY <= rect.bottom + 200;
+
+        (card as HTMLElement).style.setProperty('--mouse-opacity', isNear ? '1' : '0');
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [location.pathname]);
+
   // For Landing page, we don't display the sidebar or standard navbar (it has its own custom menu/navbar)
   const isLandingPage = location.pathname === '/';
   // Auth page also doesn't show standard layout

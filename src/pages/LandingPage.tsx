@@ -18,36 +18,31 @@ import {
 import { Earth3D } from '../components/Earth3D';
 import { useStore } from '../store/useStore';
 
-// Helper component for counting up numbers
-const Counter: React.FC<{ value: number; suffix?: string; prefix?: string; duration?: number }> = ({ 
-  value, suffix = '', prefix = '', duration = 1.5 
+// Helper component for counting up numbers using requestAnimationFrame
+const Counter: React.FC<{ value: number; decimals?: number; suffix?: string; prefix?: string; duration?: number }> = ({ 
+  value, decimals = 0, suffix = '', prefix = '', duration = 1.5 
 }) => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    let start = 0;
-    const end = value;
-    if (start === end) return;
+    let startTimestamp: number | null = null;
+    let rAFId: number;
 
-    const totalMiliseconds = duration * 1000;
-    const incrementTime = Math.max(Math.floor(totalMiliseconds / end), 10);
-    
-    const timer = setInterval(() => {
-      start += Math.ceil(end / (totalMiliseconds / incrementTime));
-      if (start >= end) {
-        clearInterval(timer);
-        setCount(end);
-      } else {
-        setCount(start);
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / (duration * 1000), 1);
+      setCount(progress * value);
+      if (progress < 1) {
+        rAFId = window.requestAnimationFrame(step);
       }
-    }, incrementTime);
-
-    return () => clearInterval(timer);
+    };
+    rAFId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(rAFId);
   }, [value, duration]);
 
   return (
-    <span className="font-mono text-4xl font-bold tracking-tight text-white">
-      {prefix}{count.toLocaleString()}{suffix}
+    <span className="font-heading font-extrabold text-3xl md:text-4xl tracking-tight text-white">
+      {prefix}{count.toFixed(decimals)}{suffix}
     </span>
   );
 };
@@ -161,7 +156,7 @@ export const LandingPage: React.FC = () => {
             className="self-start flex items-center gap-2 px-3 py-1.5 rounded-full border border-accentGreen/30 bg-accentGreen/5 text-xs text-accentGreen font-semibold uppercase tracking-wider"
           >
             <span>🌿</span>
-            <span>AI-Powered Carbon Credits</span>
+            <span>AI-Powered Energy Intelligence</span>
           </motion.div>
 
           <motion.h1
@@ -170,19 +165,18 @@ export const LandingPage: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.15 }}
             className="text-5xl md:text-7xl font-extrabold font-heading leading-tight tracking-tight text-white"
           >
-            Turn Your Energy <br />
-            <span className="text-gradient-green-cyan">Savings</span> Into <br />
-            Carbon Credits
+            Your Energy. <br />
+            Your Carbon. <br />
+            <span className="text-gradient-green-cyan">Your Future.</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-base md:text-lg text-textSecondary max-w-lg leading-relaxed"
+            className="text-base md:text-lg text-textSecondary max-w-lg leading-relaxed font-sans"
           >
-            ACCN uses machine learning models to verify real home solar and industrial grid savings,
-            generating verified trust ratings and minting legally traceable carbon offsets.
+            Track consumption. Build trust. Trade carbon credits. Verify your green credentials in real-time.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -193,37 +187,42 @@ export const LandingPage: React.FC = () => {
             className="flex flex-wrap items-center gap-4 mt-2"
           >
             <button
-              onClick={() => navigate('/dashboard')}
-              className="px-8 py-4 rounded-xl font-bold bg-accentGreen text-bgSpace hover:scale-105 transition-transform flex items-center gap-2 shadow-neon-green"
+              onClick={() => navigate('/auth')}
+              className="btn-primary shadow-neon-green/20"
             >
-              Start Earning Credits <ArrowRight className="w-5 h-5" />
+              Get Started Free
             </button>
-            <button className="px-8 py-4 rounded-xl font-bold border border-cardBorder bg-cardSurface/30 hover:bg-cardSurface/60 text-textPrimary hover:scale-105 transition-transform flex items-center gap-2">
-              Watch How It Works <Play className="w-4 h-4 fill-current text-accentCyan" />
+            <button 
+              onClick={() => {
+                const howItWorks = document.getElementById('how-it-works-timeline');
+                if (howItWorks) howItWorks.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="btn-ghost"
+            >
+              See How It Works
             </button>
           </motion.div>
 
           {/* Counters Row */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="grid grid-cols-3 gap-6 pt-10 border-t border-cardBorder max-w-md w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="flex flex-wrap items-center gap-6 pt-10 border-t border-cardBorder max-w-xl w-full text-center sm:text-left"
           >
-            <div className="flex flex-col">
-              <Counter value={12450} suffix="+" />
-              <span className="text-xs text-textSecondary mt-1 select-none">Credits Issued</span>
-              <span className="text-[10px] text-accentGreen font-mono font-bold mt-0.5">↑ 12% growth</span>
+            <div className="flex-grow flex flex-col">
+              <Counter value={2.4} decimals={1} suffix="M+ kWh" />
+              <span className="text-xs text-textSecondary mt-1 font-sans select-none">Tracked</span>
             </div>
-            <div className="flex flex-col">
-              <Counter value={240} prefix="₹" suffix="L" />
-              <span className="text-xs text-textSecondary mt-1 select-none">Volume Traded</span>
-              <span className="text-[10px] text-accentGreen font-mono font-bold mt-0.5">↑ 18% MoM</span>
+            <div className="w-px h-12 bg-cardBorder flex-shrink-0" />
+            <div className="flex-grow flex flex-col">
+              <Counter value={12400} suffix="+" />
+              <span className="text-xs text-textSecondary mt-1 font-sans select-none">Credits Traded</span>
             </div>
-            <div className="flex flex-col">
-              <Counter value={4200} suffix="T" />
-              <span className="text-xs text-textSecondary mt-1 select-none">CO₂ Offset</span>
-              <span className="text-[10px] text-accentGreen font-mono font-bold mt-0.5">↑ 14% this yr</span>
+            <div className="w-px h-12 bg-cardBorder flex-shrink-0" />
+            <div className="flex-grow flex flex-col">
+              <Counter value={98} suffix="%" />
+              <span className="text-xs text-textSecondary mt-1 font-sans select-none">Trust Accuracy</span>
             </div>
           </motion.div>
         </div>
@@ -552,7 +551,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 1.4 How It Works Accordion Timeline */}
-      <section className="py-24 bg-bgSpace border-t border-cardBorder">
+      <section id="how-it-works-timeline" className="py-24 bg-bgSpace border-t border-cardBorder">
         <div className="container mx-auto px-6 md:px-12 flex flex-col gap-12 items-center">
           <div className="text-center max-w-xl">
             <span className="text-xs font-bold font-mono text-accentGreen uppercase tracking-widest">Workflow Pipeline</span>
@@ -597,89 +596,113 @@ export const LandingPage: React.FC = () => {
 
       {/* 1.5 Marketplace Preview */}
       <section className="py-24 bg-bgMidnight border-t border-cardBorder">
-        <div className="container mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div className="container mx-auto px-6 md:px-12 flex flex-col gap-12">
           
-          {/* Left panel: Active listings */}
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold font-mono text-accentGreen uppercase tracking-widest">Active Listings</span>
-              <h2 className="text-3xl font-extrabold font-heading text-white">Carbon Marketplace Desk</h2>
-              <p className="text-xs text-textSecondary mt-1 leading-normal">
-                Direct transactions matching energy exporters with institutional buyers. Verified smart signatures establish contract settlement.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 relative overflow-hidden">
-              <AnimatePresence initial={false}>
-                {previewListings.map((listing) => (
-                  <motion.div
-                    key={listing.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                    className="p-4 rounded-xl border border-cardBorder bg-cardSurface/40 glass-panel flex items-center justify-between hover:bg-white/5 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-cardBorder border border-white/5 flex items-center justify-center font-bold text-sm text-textSecondary">
-                        {listing.seller.substring(0, 2)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white">{listing.seller}</span>
-                          <span className="text-[9px] font-mono font-bold text-accentGreen px-1.5 py-0.5 rounded bg-accentGreen/10 border border-accentGreen/20">
-                            ⭐ {listing.trust}% Trust
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-textSecondary font-mono mt-1 block">
-                          {listing.credits} CR &middot; {listing.type} Generation
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="font-mono text-xs font-bold text-white block">₹{listing.price}/cr</span>
-                      <button
-                        onClick={() => navigate('/auth')}
-                        className="px-3 py-1 rounded bg-accentGreen/10 border border-accentGreen/20 text-[10px] font-bold text-accentGreen hover:bg-accentGreen hover:text-bgSpace transition-all mt-1"
-                      >
-                        Buy Now
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+          <div className="flex flex-col items-center text-center gap-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold font-mono text-accentGreen uppercase tracking-widest">Carbon Exchange</span>
+            <h2 className="text-3xl md:text-4xl font-extrabold font-heading text-white">Live Carbon Marketplace</h2>
+            <p className="text-xs text-textSecondary leading-normal">
+              Sign in to access real-time listings, view individual credit balances, user wallets, and transaction histories.
+            </p>
           </div>
 
-          {/* Right panel: Live ticker feed */}
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold font-mono text-accentCyan uppercase tracking-widest">Live Exchange Feed</span>
-              <h3 className="text-xl font-bold font-heading text-white">Live Transactions Ticker</h3>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left panel: Blurred listings preview card */}
+            <div className="relative rounded-2xl border border-cardBorder bg-cardSurface/40 p-6 overflow-hidden glass-panel">
+              {/* Overlay with lock icon */}
+              <div className="absolute inset-0 bg-bgMidnight/60 backdrop-blur-[4px] z-10 flex flex-col items-center justify-center gap-4 p-6 text-center">
+                <div className="w-12 h-12 rounded-full bg-accentGreen/10 border border-accentGreen/30 flex items-center justify-center text-accentGreen text-lg">
+                  🔒
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Marketplace Locked</h3>
+                  <p className="text-[11px] text-textSecondary mt-1 max-w-xs">
+                    Please authenticate to view user identities, live balances, and trade books.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/auth')}
+                  className="btn-primary shadow-neon-green/20"
+                >
+                  Unlock Marketplace
+                </button>
+              </div>
 
-            <div className="flex-grow border border-cardBorder rounded-xl bg-cardSurface/60 p-4 h-64 overflow-hidden relative glass-panel">
-              {/* Vertical Auto-scrolling list container */}
-              <div className="flex flex-col gap-3.5 h-full overflow-y-auto pr-2">
-                {liveFeed.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center border-b border-cardBorder pb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-accentGreen animate-pulse" />
-                      <span className="text-xs text-textSecondary font-semibold">{item.message}</span>
+              {/* Blurred preview content */}
+              <div className="flex flex-col gap-3 filter blur-md select-none pointer-events-none">
+                <div className="p-4 rounded-xl border border-cardBorder bg-cardSurface/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-cardBorder flex items-center justify-center font-bold text-xs text-textSecondary">RK</div>
+                    <div>
+                      <span className="text-xs font-bold text-white">Rahul K.</span>
+                      <span className="text-[9px] font-mono text-accentGreen block mt-0.5">98% Trust</span>
                     </div>
-                    <span className="text-[9px] font-mono text-textMuted">{item.timestamp}</span>
                   </div>
-                ))}
+                  <div className="text-right">
+                    <span className="font-mono text-xs font-bold text-white block">₹120/cr</span>
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border border-cardBorder bg-cardSurface/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-cardBorder flex items-center justify-center font-bold text-xs text-textSecondary">PM</div>
+                    <div>
+                      <span className="text-xs font-bold text-white">Priya M.</span>
+                      <span className="text-[9px] font-mono text-accentGreen block mt-0.5">95% Trust</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-xs font-bold text-white block">₹115/cr</span>
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border border-cardBorder bg-cardSurface/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-cardBorder flex items-center justify-center font-bold text-xs text-textSecondary">AS</div>
+                    <div>
+                      <span className="text-xs font-bold text-white">Arun S.</span>
+                      <span className="text-[9px] font-mono text-accentGreen block mt-0.5">92% Trust</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-xs font-bold text-white block">₹110/cr</span>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <button
-              onClick={() => navigate('/marketplace')}
-              className="w-full py-3.5 rounded-xl border border-cardBorder bg-cardSurface/40 hover:bg-cardSurface/80 text-xs font-bold text-white flex items-center justify-center gap-2 hover:border-white/10"
-            >
-              Access Active Marketplace <ExternalLink className="w-4 h-4 text-accentCyan" />
-            </button>
+
+            {/* Right panel: Marketplace features list & Stats strip */}
+            <div className="flex flex-col gap-6 justify-center">
+              <div className="flex flex-col gap-4">
+                <h3 className="text-lg font-bold text-white font-heading">Secure Energy Trading</h3>
+                <p className="text-xs text-textSecondary leading-relaxed">
+                  The AI Carbon Credit Network provides a decentralized exchange interface where smart meter offsets are directly tokenized and traded. Once authenticated, users can:
+                </p>
+                <ul className="text-xs text-textSecondary flex flex-col gap-2.5 font-sans list-disc list-inside pl-1">
+                  <li>List excess solar or wind offsets at custom index rates.</li>
+                  <li>Perform secure in-app payments and credit settlement.</li>
+                  <li>Establish and verify cryptographically signed compliance statements.</li>
+                  <li>Increase trading liquidity limits by raising energy Trust Scores.</li>
+                </ul>
+              </div>
+
+              {/* Stats Strip */}
+              <div className="grid grid-cols-3 gap-4 border-t border-cardBorder pt-6 font-mono">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-textSecondary uppercase tracking-wider">listings</span>
+                  <span className="text-lg font-bold text-white mt-1">340+ Active</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-textSecondary uppercase tracking-wider">avg price</span>
+                  <span className="text-lg font-bold text-white mt-1">₹120.40</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-textSecondary uppercase tracking-wider">network</span>
+                  <span className="text-lg font-bold text-accentGreen mt-1 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-accentGreen animate-pulse inline-block" />
+                    LIVE
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
