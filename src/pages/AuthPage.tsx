@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, LogIn, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff, Mail, Lock, LogIn, User } from 'lucide-react';
 import { ParticleBg } from '../components/ParticleBg';
 import { useStore } from '../store/useStore';
 import { useToastStore } from '../store/useToastStore';
@@ -12,7 +12,9 @@ export const AuthPage: React.FC = () => {
   const setIsAuthenticated = useStore((state) => state.setIsAuthenticated);
   const { addToast } = useToastStore();
 
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,69 +29,15 @@ export const AuthPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Try to log in
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
-        // If login fails because user doesn't exist, auto-register them
-        if (error.message.includes('Invalid login credentials')) {
-          addToast('info', 'Registering Account', 'Account not found. Creating a new profile...');
-          
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ 
-            email, 
-            password,
-            options: {
-              data: {
-                name: email.split('@')[0],
-              }
-            }
-          });
-
-          if (signUpErr) {
-            addToast('error', 'Registration Failed', signUpErr.message);
-            setIsLoading(false);
-            return;
-          }
-
-          // Populate tables
-          if (signUpData.user) {
-            const userId = signUpData.user.id;
-            
-            // Insert profile
-            await supabase.from('profiles').insert({
-              id: userId,
-              name: email.split('@')[0],
-              email: email,
-              trust_score: 96,
-              kyc_verified: true,
-              location: 'Hyderabad, India'
-            });
-            
-            // Insert wallet
-            const walletAddr = '0x' + Math.random().toString(36).substring(2, 10).toUpperCase() + '...' + Math.random().toString(36).substring(2, 6).toUpperCase();
-            await supabase.from('wallets').insert({
-              user_id: userId,
-              address: walletAddr,
-              balance: 2450.0,
-              credits: 25.5
-            });
-
-            addToast('success', 'Onboarding Complete', 'Created account and generated new carbon wallet.');
-            setIsAuthenticated(true);
-            await useStore.getState().initializeStore();
-            navigate('/dashboard');
-            setIsLoading(false);
-            return;
-          }
-        }
-
         addToast('error', 'Authentication Failed', error.message);
         setIsLoading(false);
         return;
       }
 
-      // Successful login
-      addToast('success', 'Welcome Back!', 'Successfully authenticated via Supabase.');
+      addToast('success', 'Welcome Back!', 'Successfully authenticated.');
       setIsAuthenticated(true);
       await useStore.getState().initializeStore();
       navigate('/dashboard');
@@ -100,14 +48,104 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password || !name) {
+      addToast('error', 'Registration Failed', 'Please fill in all fields.');
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            name: name,
+          }
+        }
+      });
+
+      if (error) {
+        addToast('error', 'Registration Failed', error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        const userId = data.user.id;
+        
+        // Insert profile
+        await supabase.from('profiles').insert({
+          id: userId,
+          name: name,
+          email: email,
+          trust_score: 96,
+          kyc_verified: true,
+          location: 'Hyderabad, India'
+        });
+        
+        // Insert wallet
+        const walletAddr = '0x' + Math.random().toString(36).substring(2, 10).toUpperCase() + '...' + Math.random().toString(36).substring(2, 6).toUpperCase();
+        await supabase.from('wallets').insert({
+          user_id: userId,
+          address: walletAddr,
+          balance: 2450.0,
+          credits: 25.5
+        });
+
+        addToast('success', 'Account Created', 'Successfully registered and wallet generated.');
+        setIsAuthenticated(true);
+        await useStore.getState().initializeStore();
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      addToast('error', 'Registration Failed', err.message || 'An unexpected error occurred.');
+    } finally {
       setIsLoading(false);
-      setIsAuthenticated(true);
-      addToast('success', 'Logged in via OAuth', `Connected successfully using ${provider}.`);
-      navigate('/dashboard');
-    }, 1000);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    if (isSignUp) {
+      handleSignUp(e);
+    } else {
+      handleLogin(e);
+    }
+  };
+
+  const handleSocialLogin = async (provider: string) => {
+    if (provider === 'Google') {
+      setIsLoading(true);
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            queryParams: {
+              prompt: 'select_account',
+            },
+            redirectTo: window.location.origin + '/dashboard'
+          }
+        });
+        if (error) {
+          addToast('error', 'OAuth Failed', error.message);
+        }
+      } catch (err: any) {
+        addToast('error', 'OAuth Failed', err.message || 'An error occurred during social sign-in.');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(true);
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsAuthenticated(true);
+        addToast('success', 'Logged in via OAuth', `Connected successfully using ${provider}.`);
+        navigate('/dashboard');
+      }, 1000);
+    }
   };
 
   return (
@@ -134,9 +172,11 @@ export const AuthPage: React.FC = () => {
             🌿
           </div>
           <div>
-            <h2 className="text-xl font-bold font-heading text-white">Welcome to ACCN</h2>
-            <span className="text-[11px] font-mono text-accentGreen uppercase tracking-widest mt-1 block">
-              AI-Powered Carbon Credits
+            <h2 className="text-xl font-bold font-heading text-gradient-purple-cyan tracking-wide">
+              {isSignUp ? 'Create ACCN Account' : 'Welcome to ACCN'}
+            </h2>
+            <span className="text-[10px] font-mono text-accentGreen uppercase tracking-widest mt-1 block">
+              {isSignUp ? 'Join the Carbon Network' : 'AI-Powered Carbon Credits'}
             </span>
           </div>
         </div>
@@ -179,8 +219,36 @@ export const AuthPage: React.FC = () => {
           <div className="h-px bg-cardBorder flex-grow" />
         </div>
 
-        {/* Email Credentials Form */}
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+        {/* Form Container */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <AnimatePresence initial={false}>
+            {isSignUp && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-1.5 overflow-hidden"
+              >
+                <label className="text-[10px] font-mono text-textSecondary uppercase tracking-widest font-semibold ml-1 select-none">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required={isSignUp}
+                    disabled={isLoading}
+                    placeholder="Rahul Kumar"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm"
+                  />
+                  <User className="absolute left-3.5 top-3.5 w-4 h-4 text-textSecondary" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-mono text-textSecondary uppercase tracking-widest font-semibold ml-1 select-none">
               Email Address
@@ -204,13 +272,15 @@ export const AuthPage: React.FC = () => {
               <label className="text-[10px] font-mono text-textSecondary uppercase tracking-widest font-semibold select-none">
                 Password
               </label>
-              <button
-                type="button"
-                className="text-[10px] text-accentCyan hover:underline font-semibold select-none"
-                onClick={() => addToast('info', 'Reset Triggered', 'Password reset token dispatched to inbox.')}
-              >
-                Forgot?
-              </button>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  className="text-[10px] text-accentCyan hover:underline font-semibold select-none cursor-pointer"
+                  onClick={() => addToast('info', 'Reset Triggered', 'Password reset token dispatched to inbox.')}
+                >
+                  Forgot?
+                </button>
+              )}
             </div>
             <div className="relative">
               <input
@@ -236,17 +306,17 @@ export const AuthPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full mt-2 py-3.5 rounded-xl bg-accentGreen text-bgSpace font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-neon-green disabled:opacity-50 disabled:pointer-events-none"
+            className="w-full mt-2 py-3.5 rounded-xl bg-accentGreen text-bgSpace font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-neon-green disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
           >
             {isLoading ? (
               <>
                 <div className="w-4.5 h-4.5 border-2 border-bgSpace border-t-transparent rounded-full animate-spin" />
-                Signing in...
+                Processing...
               </>
             ) : (
               <>
-                Authorize Credentials
-                <LogIn className="w-4.5 h-4.5" />
+                {isSignUp ? 'Create Carbon Profile' : 'Authorize Credentials'}
+                <LogIn className="w-4.5 h-4.5 animate-pulse" />
               </>
             )}
           </button>
@@ -254,12 +324,16 @@ export const AuthPage: React.FC = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center text-xs text-textSecondary select-none">
-          Don't have an account?{' '}
+          {isSignUp ? 'Already have an ACCN profile?' : "Don't have an account?"}{' '}
           <button
-            onClick={() => addToast('info', 'Registration', 'Sign up is temporarily invite-only.')}
-            className="text-accentGreen font-bold hover:underline"
+            type="button"
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              addToast('info', 'View Swapped', `Switched layout to ${!isSignUp ? 'Registration Form' : 'Login Credentials'}`);
+            }}
+            className="text-accentGreen font-bold hover:underline cursor-pointer"
           >
-            Request Access &rarr;
+            {isSignUp ? 'Sign In' : 'Create Account'} &rarr;
           </button>
         </div>
       </motion.div>
